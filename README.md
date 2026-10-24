@@ -14,7 +14,7 @@ Built for **SOCIOTHON 2026, IIT Roorkee** (theme: waste management).
 | **Live app** | https://kachra-report-card.onrender.com |
 | **Compliance report** | https://kachra-report-card.onrender.com/report.html |
 | **QR stickers for bins** | https://kachra-report-card.onrender.com/qr.html |
-| **Stack** | Python 3.12, Starlette, SQLite, Gemini, ElevenLabs, Render, plain-JS installable web app |
+| **Stack** | Python 3.12, Starlette, SQLite, Gemini, our TrashNet model (scikit-learn), ElevenLabs, Render, plain-JS installable web app |
 
 > The free Render instance sleeps when idle. The first request can take about 50 seconds to wake it.
 
@@ -200,6 +200,35 @@ flowchart LR
    photo. Over a few weeks this gives a campus-specific dataset on which a small on-device detector (for example a
    YOLO-class model) could be trained and checked against the same evals.
 
+### Our own model, trained on real data
+
+We trained a waste-material classifier on **TrashNet** (Thung & Yang, Stanford 2016, MIT licence): 2,527 real
+photos of single waste items in six classes. It powers the 📷 "which bin is this?" photo check in the helper chat
+(`POST /api/identify-item`).
+
+| | |
+| --- | --- |
+| Data | TrashNet `dataset-resized`: cardboard 403, glass 501, metal 410, paper 594, plastic 482, trash 137 |
+| Split | stratified 80 / 20 (2,021 train, 506 held-out test); the test split was used once |
+| Features | HSV colour histogram + HOG (shape) + LBP (surface texture), with horizontal-flip augmentation |
+| Model | RBF-kernel SVM, hyper-parameters chosen by 4-fold cross-validation on the training split only |
+| **Test accuracy** | **76.9%** (macro F1 0.75), against 63% for the SVM baseline in the original TrashNet report |
+
+| Class | Precision | Recall | F1 |
+| --- | --- | --- | --- |
+| cardboard | 0.83 | 0.84 | 0.83 |
+| glass | 0.78 | 0.76 | 0.77 |
+| metal | 0.66 | 0.80 | 0.73 |
+| paper | 0.85 | 0.86 | 0.85 |
+| plastic | 0.71 | 0.64 | 0.67 |
+| trash | 0.79 | 0.56 | 0.65 |
+
+The most common confusions are plastic → metal (14 of 97) and glass → metal (10 of 100): shiny, reflective
+surfaces. Predictions below 55% confidence are returned as "not sure" instead of a guess. TrashNet covers dry-bin
+materials only (no food, sanitary or hazardous items), so wet, sanitary and special-care items are still identified
+by the vision-language model. Reproduce with `python -m ml.train_trashnet <path to dataset-resized>`; full metrics
+and the confusion matrix are in `ml/model/metrics.json`.
+
 ### Model design, from the research
 
 Which model should identify the waste? The literature gives a clear answer: **off-the-shelf models are not
@@ -231,10 +260,10 @@ flowchart LR
     L -->|teacher-ensemble pseudo-labels<br/>+ worker labels| Y
 ```
 
-- **Stage 1** gives per-item boxes, works offline and costs nothing per photo.
+- **Stage 1** gives per-item boxes, works offline and costs nothing per photo. Our first step towards it is the TrashNet classifier above (76.9% test accuracy).
 - **Stage 2** handles low-confidence and unusual items, using the local rules, as today.
 - **The loop** turns every worker check into a label. Ensemble pseudo-labelling covers the unlabelled photos, following the BMVC 2025 method.
-- **Today the app runs Stage 2 only**, and collects the labels Stage 1 needs. The same evals and thresholds would gate any new model before it replaces the current one.
+- **Today the app runs Stage 2 for bins and our TrashNet classifier for single-item photos**, and collects the labels a Stage 1 detector needs. The same evals and thresholds would gate any new model before it replaces the current one.
 
 ---
 
@@ -559,7 +588,7 @@ pip install -r requirements-dev.txt
 python -m unittest discover -s tests -t . -v
 ```
 
-98 tests, all offline (they use the mock provider and a temporary data folder).
+100 tests, all offline (they use the mock provider and a temporary data folder).
 
 | File | Covers |
 | --- | --- |
@@ -571,6 +600,7 @@ python -m unittest discover -s tests -t . -v
 | `tests/test_hardening.py` | size limits, rate limiting, image checks, EXIF stripping |
 | `tests/test_operations.py` | worker checks, collection order, forecast, CO₂e, compliance report |
 | `tests/test_identify.py` | item → correct bin mapping, hazard flags, hazards in their own bin, hazard priority in the collection order |
+| `tests/test_item_model.py` | our TrashNet model: output shape, endpoint, bad uploads, model card |
 | `tests/test_chat.py` | helper chat: sorting answers, no guessing, complaints in English/Hinglish/Hindi, status, scores |
 | `tests/test_workflows_wiring.py` | hand-off to Render Workflows and reading its result |
 
@@ -623,6 +653,8 @@ All responses are JSON. Errors return `{"error": "..."}` with a 4xx or 5xx statu
 | POST | `/api/issues` | `{"bhawan", "kind", "note"}`; `kind` is `overflow`, `missed_pickup`, `broken_bin` or `other` | the complaint |
 | GET | `/api/issues` | `status=open` | complaints |
 | POST | `/api/issues/{id}/resolve` | | the complaint, marked fixed |
+| POST | `/api/identify-item` | multipart `photo` of one item → material, bin, confidence (our TrashNet model) |
+| GET | `/api/model` | the item model's metrics |
 | POST | `/api/chat` | `{"message": "bin is full at Govind", "lang": "en", "context": null}` | `say`, `choices`, next `context`, `action` |
 
 ### Voice agent tools
@@ -676,6 +708,7 @@ app/
   ratelimit.py       upload size and per-IP write limits
   pipeline.py        grading inline or on Render Workflows
   config.py          settings and domain constants
+ml/                  TrashNet training script, trained model and metrics
 evals/               golden dataset, replay recordings, eval harness
 workflows/main.py    Render Workflows tasks
 scripts/             demo seeding, nightly trigger, photo evals, smoke test

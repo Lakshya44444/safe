@@ -1,0 +1,112 @@
+{
+  "dataset": "TrashNet (Thung & Yang 2016), dataset-resized, 2,527 images, 6 classes, MIT licence",
+  "split": "stratified 80/20, random_state=42; test split used once",
+  "train_images": 2021,
+  "test_images": 506,
+  "features": "HSV histogram (12x4x4) + HOG (9 orientations, 16px cells) + uniform LBP (P=8, R=1)",
+  "model": "StandardScaler + RBF SVM, {'svc__C': 3, 'svc__gamma': 0.0005}, class_weight=balanced",
+  "cv_accuracy": 0.747,
+  "test_accuracy": 0.769,
+  "test_macro_f1": 0.751,
+  "dry_vs_not_accuracy": 0.968,
+  "per_class": {
+    "cardboard": {
+      "precision": 0.829,
+      "recall": 0.84,
+      "f1-score": 0.834,
+      "support": 81.0
+    },
+    "glass": {
+      "precision": 0.776,
+      "recall": 0.76,
+      "f1-score": 0.768,
+      "support": 100.0
+    },
+    "metal": {
+      "precision": 0.66,
+      "recall": 0.805,
+      "f1-score": 0.725,
+      "support": 82.0
+    },
+    "paper": {
+      "precision": 0.85,
+      "recall": 0.857,
+      "f1-score": 0.854,
+      "support": 119.0
+    },
+    "plastic": {
+      "precision": 0.713,
+      "recall": 0.639,
+      "f1-score": 0.674,
+      "support": 97.0
+    },
+    "trash": {
+      "precision": 0.789,
+      "recall": 0.556,
+      "f1-score": 0.652,
+      "support": 27.0
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "cardboard",
+      "glass",
+      "metal",
+      "paper",
+      "plastic",
+      "trash"
+    ],
+    "rows_true_cols_pred": [
+      [
+        68,
+        2,
+        3,
+        3,
+        5,
+        0
+      ],
+      [
+        2,
+        76,
+        10,
+        3,
+        8,
+        1
+      ],
+      [
+        1,
+        7,
+        66,
+        2,
+        6,
+        0
+      ],
+      [
+        5,
+        2,
+        5,
+        102,
+        4,
+        1
+      ],
+      [
+        6,
+        6,
+        14,
+        7,
+        62,
+        2
+      ],
+      [
+        0,
+        5,
+        2,
+        3,
+        2,
+        15
+      ]
+    ]
+  },
+  "reference": "Thung & Yang (2016) report 63% test accuracy for an SVM on SIFT features on this dataset",
+  "train_seconds": 528
+}
