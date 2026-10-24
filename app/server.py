@@ -24,7 +24,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from . import chat as chat_bot
-from . import config, db, grader, images, pipeline, scoring, voice
+from . import config, db, grader, images, item_model, pipeline, scoring, voice
 from .identify import identify
 from .llm_gateway import get_gateway
 from .matching import match_bhawan, match_issue_kind, match_stream
@@ -84,6 +84,7 @@ async def meta(request: Request):
         "stt": voice.stt_available(),
         "agent_id": config.ELEVENLABS_AGENT_ID or None,
         "workflows": bool(config.RENDER_WORKFLOW_SLUG),
+        "item_model": item_model.available(),
     })
 
 
@@ -254,6 +255,25 @@ async def transcribe(request: Request):
         return fail(str(e), 502)
 
 
+async def identify_item(request: Request):
+    """Photo of ONE item -> material and bin, from our own model trained on TrashNet."""
+    async with request.form() as form:
+        f = form.get("photo")
+        if not isinstance(f, UploadFile):
+            return fail("Send the item photo as 'photo'.")
+        data = await read_upload(f)
+    if not images.sniff(data):
+        return fail("Upload a JPEG, PNG or WebP photo.")
+    try:
+        return JSONResponse(await run_in_threadpool(item_model.classify, data))
+    except RuntimeError as e:
+        return fail(str(e), 503)
+
+
+async def model_card(request: Request):
+    return JSONResponse({"available": item_model.available(), "metrics": item_model.metrics()})
+
+
 # ---------- collection issues ----------
 
 class IssueIn(BaseModel):
@@ -401,6 +421,8 @@ routes = [
     Route("/api/agent/issue", agent_issue, methods=["POST"]),
     Route("/api/agent/score", agent_score, methods=["POST"]),
     Route("/api/chat", chat, methods=["POST"]),
+    Route("/api/identify-item", identify_item, methods=["POST"]),
+    Route("/api/model", model_card),
 ]
 if STATIC_DIR.exists():
     routes.append(Mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static"))

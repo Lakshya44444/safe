@@ -6,3 +6,7 @@ pydantic>=2.6
 Pillow>=10.0
 # Optional: LangSmith tracing and eval experiments (LANGSMITH_TRACING=true)
 langsmith>=0.3
+# Our TrashNet item model (ml/): same scikit-learn version it was trained with, so the pickle loads
+scikit-learn==1.9.1
+scikit-image>=0.24
+joblib>=1.3

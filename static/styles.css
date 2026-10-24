@@ -495,3 +495,6 @@ a { color: inherit; }
 .mark-hazard.on { outline: 2px solid var(--pen); }
 .mark-hazard.on dd { color: var(--pen); }
 .ident .to.ok { color: var(--pass); }
+.chat-cam { display: grid; place-items: center; min-width: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); font-size: 1.3rem; cursor: pointer; }
+.msg-img { display: block; max-width: 160px; max-height: 160px; border-radius: 10px; }
+.msg-note { display: block; margin-top: .3rem; font-size: .75rem; opacity: .7; }

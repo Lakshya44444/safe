@@ -39,11 +39,42 @@
   panel.setAttribute("aria-label", "Chat");
   panel.innerHTML = `<header><b></b><button type="button" class="chat-x" aria-label="Close">×</button></header>
     <div class="chat-log" aria-live="polite"></div><div class="chat-chips"></div>
-    <form class="chat-form"><input type="text" maxlength="500" autocomplete="off"><button type="submit"></button></form>`;
+    <form class="chat-form"><label class="chat-cam" title="Photo of one item"><input type="file" accept="image/*" capture="environment" hidden>📷</label><input type="text" maxlength="500" autocomplete="off"><button type="submit"></button></form>`;
   document.body.append(fab, panel);
   const log = panel.querySelector(".chat-log");
   const chips = panel.querySelector(".chat-chips");
-  const input = panel.querySelector("input");
+  const input = panel.querySelector('input[type="text"]');
+  const cam = panel.querySelector('.chat-cam input');
+  const STREAM_WORD = { en: { dry: "dry (blue)", wet: "wet (green)", sanitary: "sanitary", special_care: "special care" },
+                        hi: { dry: "सूखे (नीले)", wet: "गीले (हरे)", sanitary: "सैनिटरी", special_care: "स्पेशल केयर" } };
+  const MAT_HI = { cardboard: "गत्ता", glass: "कांच", metal: "धातु", paper: "कागज़", plastic: "प्लास्टिक", trash: "मिला-जुला कूड़ा" };
+  cam.onchange = async () => {
+    const f = cam.files[0];
+    if (!f) return;
+    const hi = L() === "hi";
+    const me = el("div", "msg me");
+    const img = el("img", "msg-img"); img.src = URL.createObjectURL(f); img.alt = "";
+    me.append(img); log.append(me);
+    const wait = bubble("…", "bot");
+    try {
+      const fd = new FormData(); fd.append("photo", f);
+      const r = await fetch(API + "/api/identify-item", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      const pct = Math.round(d.confidence * 100);
+      const mat = (m) => (hi ? MAT_HI[m] || m : m);
+      wait.textContent = d.sure
+        ? (hi ? `यह ${mat(d.material)} लगता है (${pct}% भरोसा)। यह ${STREAM_WORD.hi[d.stream]} डब्बे में जाता है।`
+              : `This looks like ${d.material} (${pct}% sure). It goes in the ${STREAM_WORD.en[d.stream]} bin.`)
+        : (hi ? `पक्का नहीं (${mat(d.top[0].material)}? ${pct}%)। चीज़ का नाम लिखकर पूछें, या स्टाफ़ से पूछें।`
+              : `I'm not sure (${d.top[0].material}? ${pct}%). Type the item's name, or ask the staff.`);
+      wait.append(el("small", "msg-note", hi ? "हमारा अपना मॉडल, TrashNet पर ट्रेन किया" : "our own model, trained on TrashNet"));
+    } catch (e) {
+      wait.textContent = e.message || S[L()].err;
+    }
+    cam.value = "";
+    log.scrollTop = log.scrollHeight;
+  };
 
   function label() {
     const s = S[L()];
