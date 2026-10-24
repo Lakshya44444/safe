@@ -91,7 +91,8 @@ def _ask_gemini(path: str, stream: str) -> dict:
         ]}],
         "generationConfig": {"responseMimeType": "application/json", "temperature": 0},
     }
-    r = requests.post(url, params={"key": config.GEMINI_API_KEY}, json=body, timeout=60)
+    # Key goes in a header (works for both AIza... and newer AQ.... keys, and stays out of URL logs).
+    r = requests.post(url, headers={"x-goog-api-key": config.GEMINI_API_KEY}, json=body, timeout=60)
     r.raise_for_status()
     text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
     return _parse_json(text)
