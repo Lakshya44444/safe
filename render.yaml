@@ -1,10 +1,11 @@
-# Render Blueprint for the web API + nightly cron.
-# The Workflow service (workflows/main.py) is created from the Render Dashboard,
-# because Blueprints do not support Workflow services yet.
+# Render Blueprint: the web API + front end on the free plan (no card needed).
+# render-full.yaml adds the paid Starter plan and the nightly cron job (needs a card on file;
+# hackathon credits cover it). The Workflow service is created from the Dashboard.
 services:
   - type: web
     name: kachra-report-card
     runtime: python
+    plan: free
     buildCommand: pip install -r requirements.txt && pip install render
     startCommand: python -m scripts.seed_demo_if_empty && uvicorn app.server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
@@ -34,18 +35,4 @@ services:
       - key: RENDER_API_KEY
         sync: false
       - key: RENDER_WORKFLOW_SLUG
-        sync: false
-
-  - type: cron
-    name: kachra-nightly-briefing
-    runtime: python
-    schedule: "30 16 * * *"   # 22:00 IST every night
-    buildCommand: pip install -r requirements-workflows.txt
-    startCommand: python scripts/nightly.py
-    envVars:
-      - key: RENDER_API_KEY
-        sync: false
-      - key: RENDER_WORKFLOW_SLUG
-        sync: false
-      - key: API_BASE
         sync: false

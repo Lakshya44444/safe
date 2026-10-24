@@ -1,0 +1,53 @@
+# Full Render Blueprint: web API on Starter + nightly cron (needs a card; credits cover it).
+# Use it by setting Blueprint Path to render-full.yaml.
+# The Workflow service (workflows/main.py) is created from the Render Dashboard,
+# because Blueprints do not support Workflow services yet.
+services:
+  - type: web
+    name: kachra-report-card
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt && pip install render
+    startCommand: python -m scripts.seed_demo_if_empty && uvicorn app.server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: GRADER_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LLM_FALLBACKS
+        value: ""
+      - key: LANGSMITH_TRACING
+        value: "false"
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_PROJECT
+        value: kachra-report-card
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: ELEVENLABS_AGENT_ID
+        sync: false
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_WORKFLOW_SLUG
+        sync: false
+
+  - type: cron
+    name: kachra-nightly-briefing
+    runtime: python
+    schedule: "30 16 * * *"   # 22:00 IST every night
+    buildCommand: pip install -r requirements-workflows.txt
+    startCommand: python scripts/nightly.py
+    envVars:
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_WORKFLOW_SLUG
+        sync: false
+      - key: API_BASE
+        sync: false
