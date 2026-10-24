@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SWM Compliance Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Hind:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { background: var(--paper); }
+    .rep { max-width: 900px; margin: 0 auto; padding: 1.4rem 16px 3rem; color: var(--ink); }
+    .rep h1 { font-family: var(--display); font-size: clamp(1.6rem, 4vw, 2.3rem); margin: 0; line-height: 1.1; }
+    .rep h2 { font-family: var(--display); font-size: 1.3rem; margin: 2rem 0 .6rem; border-bottom: 2px solid var(--line); padding-bottom: .25rem; }
+    .rep .sub { color: var(--ink-soft); margin: .3rem 0 0; }
+    .rep .ctrl { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: 1rem 0; }
+    .rep .ctrl select, .rep .ctrl button { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); color: var(--ink); padding: 0 .8rem; font: inherit; }
+    .rep .ctrl button { background: var(--ink); color: var(--paper-2); border: 0; font-weight: 600; cursor: pointer; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .7rem; }
+    .kpi { background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px; padding: .7rem .9rem; }
+    .kpi b { display: block; font-family: var(--display); font-size: 1.7rem; line-height: 1.1; }
+    .kpi span { color: var(--ink-soft); font-size: .88rem; }
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; background: var(--paper-2); }
+    th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .g { font-family: var(--display); font-weight: 800; }
+    .g-A { color: var(--pass); } .g-B { color: var(--warn); } .g-C { color: var(--pen); }
+    .method { font-size: .88rem; color: var(--ink-soft); line-height: 1.55; }
+    .method li { margin-bottom: .3rem; }
+    .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 3rem; }
+    .sign div { border-top: 1.5px solid var(--ink); padding-top: .3rem; font-size: .88rem; }
+    .back { color: var(--ink-soft); }
+    @media print {
+      .ctrl, .back { display: none; }
+      body, table, .kpi { background: #fff; }
+      .rep { padding: 0; }
+      h2 { break-after: avoid; }
+      tr { break-inside: avoid; }
+    }
+    @media (max-width: 560px) { .sign { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="rep">
+    <p><a class="back" href="./">← Back to the report card</a></p>
+    <h1>Waste segregation compliance report</h1>
+    <p class="sub">IIT Roorkee hostels (Bhawans) · Solid Waste Management Rules 2026, four-stream source segregation</p>
+    <p class="sub" id="period">Loading…</p>
+
+    <div class="ctrl">
+      <label for="days">Period</label>
+      <select id="days">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <button type="button" onclick="window.print()">Print / save as PDF</button>
+    </div>
+
+    <h2>1. Summary</h2>
+    <div class="kpis" id="kpis"></div>
+
+    <h2>2. Segregation by stream</h2>
+    <div class="tbl-wrap"><table id="streams"></table></div>
+
+    <h2>3. Bhawan-wise performance</h2>
+    <div class="tbl-wrap"><table id="bhawans"></table></div>
+
+    <h2>4. Bhawans needing attention</h2>
+    <div class="tbl-wrap"><table id="forecast"></table></div>
+
+    <h2>5. Collection complaints</h2>
+    <div class="tbl-wrap"><table id="issues"></table></div>
+
+    <h2>6. Method and limits</h2>
+    <ul class="method" id="method"></ul>
+
+    <div class="sign">
+      <div>Prepared by (Estate / Sanitation office)</div>
+      <div>Reviewed by (Chairperson, Hostel Management)</div>
+    </div>
+  </main>
+
+  <script>
+  "use strict";
+  const API = (new URLSearchParams(location.search).get("api") || "").replace(/\/$/, "");
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const NAMES = { wet: "Wet (biodegradable)", dry: "Dry", sanitary: "Sanitary", special_care: "Special care" };
+  const KIND = { overflow: "Overflowing bin", missed_pickup: "Missed pickup", broken_bin: "Broken bin", other: "Other" };
+  const letter = (s) => (s >= 80 ? "A" : s >= 60 ? "B" : "C");
+  const n = (x) => (x ?? 0).toLocaleString("en-IN");
+  const day = (iso) => new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+  async function load() {
+    const days = $("#days").value;
+    let r;
+    try {
+      const res = await fetch(`${API}/api/compliance?days=${days}`);
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      r = await res.json();
+    } catch (e) {
+      $("#period").textContent = "Could not load the report: " + e.message;
+      return;
+    }
+    const s = r.summary, wc = s.worker_checks || {};
+    $("#period").textContent = `Period: last ${r.period_days} days · generated ${day(r.generated_at)} IST`;
+
+    $("#kpis").innerHTML = [
+      [n(s.reports), "bins checked"],
+      [`${s.segregation_rate}%`, "bins correctly segregated (grade A)"],
+      [`~${n(s.compost_kg_estimate)} kg`, "wet waste fit for on-site composting (est.)"],
+      [`~${n(s.co2e_kg_avoided_estimate)} kg`, "CO₂e avoided vs landfill (est.)"],
+      [`${s.issues.total} / ${s.issues.open}`, "complaints raised / still open"],
+      [s.issues.avg_hours_to_fix != null ? `${s.issues.avg_hours_to_fix} h` : "–", "average time to fix a complaint"],
+      [wc.agreement_rate != null ? `${wc.agreement_rate}%` : "–", `AI grades confirmed by workers (${wc.checked || 0} checked)`],
+    ].map(([v, l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join("");
+
+    $("#streams").innerHTML = `<tr><th>Stream</th><th class="num">Bins checked</th><th class="num">Clean (A)</th></tr>` +
+      Object.entries(s.by_stream).map(([k, v]) => `<tr><td>${NAMES[k] || esc(k)}</td><td class="num">${n(v.reports)}</td><td class="num">${v.reports ? v.clean_rate + "%" : "–"}</td></tr>`).join("");
+
+    $("#bhawans").innerHTML = `<tr><th class="num">Rank</th><th>Bhawan</th><th class="num">Score</th><th>Grade</th><th class="num">Checks</th><th class="num">A / B / C</th><th>Most common wrong items</th></tr>` +
+      (r.bhawans.length ? r.bhawans.map((b) => `<tr><td class="num">${b.rank}</td><td>${esc(b.bhawan)}</td><td class="num">${b.score}</td>
+        <td class="g g-${letter(b.score)}">${letter(b.score)}</td><td class="num">${b.reports}</td>
+        <td class="num">${b.grades.A} / ${b.grades.B} / ${b.grades.C}</td><td>${esc(b.top_wrong_items.join(", ")) || "–"}</td></tr>`).join("")
+        : `<tr><td colspan="7">No graded checks in this period.</td></tr>`);
+
+    const fc = r.forecast.filter((f) => f.needs_nudge);
+    $("#forecast").innerHTML = `<tr><th>Bhawan</th><th class="num">Latest daily score</th><th class="num">Trend / day</th><th class="num">Expected next day</th></tr>` +
+      (fc.length ? fc.map((f) => `<tr><td>${esc(f.bhawan)}</td><td class="num">${f.last}</td><td class="num">${f.slope_per_day > 0 ? "+" : ""}${f.slope_per_day}</td><td class="num g g-${letter(f.tomorrow)}">${f.tomorrow}</td></tr>`).join("")
+        : `<tr><td colspan="4">No Bhawan is below a B or falling fast.</td></tr>`);
+
+    const iss = r.issues;
+    $("#issues").innerHTML = `<tr><th>Raised</th><th>Bhawan</th><th>Problem</th><th>Status</th><th class="num">Hours to fix</th></tr>` +
+      (iss.length ? iss.map((i) => {
+        const h = i.resolved_at ? ((new Date(i.resolved_at) - new Date(i.created_at)) / 36e5).toFixed(1) : "–";
+        return `<tr><td>${day(i.created_at)}</td><td>${esc(i.bhawan)}</td><td>${KIND[i.kind] || esc(i.kind)}${i.note ? ` – ${esc(i.note)}` : ""}</td><td>${i.status}</td><td class="num">${h}</td></tr>`;
+      }).join("") : `<tr><td colspan="5">No complaints raised.</td></tr>`);
+
+    const m = r.method;
+    $("#method").innerHTML = [
+      `Each check is one bin, graded from a photo and/or the worker's spoken note by an AI model (${esc(m.llm_chain.join(" → "))}). Grade A: up to ${m.grade_cutoffs.A}% of items belong in another stream; B: up to ${m.grade_cutoffs.B}%; C: more.`,
+      `Workers can confirm or correct each grade on the spot; a corrected grade replaces the AI grade in the scores, and the AI's original grade is kept to measure its accuracy.`,
+      `Compost estimate = clean wet bins × ${m.kg_per_wet_bin} kg per bin (assumed average fill; weigh a sample of bins to calibrate).`,
+      `CO₂e estimate = compost estimate × ${m.co2e_factor} kg CO₂e per kg. Source: ${esc(m.co2e_source)}. Indicative only, not a certified emissions figure.`,
+      `"Needs attention" fits a straight line to each Bhawan's daily scores over the last ${Math.min(r.period_days, 14)} days (at least 3 days of data) and flags those expected below 60 or falling 5+ points a day.`,
+      `Scores reflect the bins that were checked, not every bin on campus.`,
+    ].map((x) => `<li>${x}</li>`).join("");
+  }
+  $("#days").onchange = load;
+  load();
+  </script>
+</body>
+</html>

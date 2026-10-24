@@ -306,7 +306,7 @@ a { color: inherit; }
   .hero { grid-template-columns: minmax(0, 1fr); text-align: center; padding-top: .6rem; }
   .remark { margin-inline: auto; }
   .marks { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); text-align: left; }
-  .marks .mark:last-child { grid-column: 1 / -1; }
+  .marks .mark:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .stamp-xl { width: 150px; height: 150px; font-size: 5.4rem; }
   .bins { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .step { grid-template-columns: 1.8rem minmax(0, 1fr); gap: .5rem; }
@@ -411,3 +411,32 @@ a { color: inherit; }
   .tile-stamp { width: 42px; height: 42px; font-size: 1.3rem; }
   .tile-body p { display: none; }
 }
+
+/* ---- collection order + nudge ---- */
+.duo-even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.plan, .nudge { list-style: none; padding: 0; margin: 0; display: grid; gap: .6rem; }
+.plan li, .nudge li { background: var(--paper-2); border-radius: 12px; padding: .65rem .85rem; box-shadow: var(--shadow); min-width: 0; }
+.plan li { display: flex; gap: .75rem; align-items: flex-start; }
+.plan-n { flex: none; width: 1.9rem; height: 1.9rem; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--paper-2); font-family: var(--display); font-weight: 800; }
+.plan b, .nudge b { font-family: var(--display); font-size: 1.1rem; }
+.plan small, .nudge small { display: block; color: var(--ink-soft); font-size: .85rem; line-height: 1.4; }
+.nudge li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .1rem .6rem; align-items: center; }
+.nudge small { grid-column: 1 / -1; }
+.nudge-grade { font-family: var(--display); font-weight: 800; font-size: 1.15rem; border: 2px solid currentColor; border-radius: 8px; padding: 0 .45rem; transform: rotate(-4deg); }
+.nudge-grade.g-A { color: var(--pass); } .nudge-grade.g-B { color: var(--warn); } .nudge-grade.g-C { color: var(--pen); }
+.play-mini { grid-column: 1 / -1; justify-self: start; margin-top: .35rem; display: inline-flex; align-items: center; gap: .35rem; border: 1.5px solid var(--line); background: none; color: var(--ink); border-radius: 999px; padding: .2rem .7rem; font-size: .85rem; font-weight: 600; }
+.play-mini svg { width: 14px; height: 14px; fill: currentColor; }
+.plan li.empty, .nudge li.empty { background: none; box-shadow: none; padding: 0; display: block; color: var(--ink-soft); font-family: var(--hand); font-size: 1.15rem; }
+
+/* ---- worker check on the result ---- */
+.verdict { margin-top: 1rem; padding: .85rem 1rem; border: 1.5px dashed var(--line); border-radius: 14px; }
+.verdict-q, .verdict-pick p { margin: 0 0 .5rem; font-weight: 600; }
+.verdict-pick { margin-top: .75rem; }
+.verdict-row { display: flex; flex-wrap: wrap; gap: .5rem; }
+.verdict-row button { border: 1.5px solid var(--line); background: var(--paper-2); color: var(--ink); border-radius: 12px; padding: .5rem .9rem; font-weight: 600; min-height: 44px; }
+.verdict-row button.g-A { color: var(--pass); border-color: var(--pass); font-family: var(--display); font-size: 1.2rem; min-width: 3.2rem; }
+.verdict-row button.g-B { color: var(--warn); border-color: var(--warn); font-family: var(--display); font-size: 1.2rem; min-width: 3.2rem; }
+.verdict-row button.g-C { color: var(--pen); border-color: var(--pen); font-family: var(--display); font-size: 1.2rem; min-width: 3.2rem; }
+.verdict-row button:disabled { opacity: .5; }
+.verdict-done { margin: 0; color: var(--pass); font-weight: 600; }
+@media (max-width: 860px) { .duo-even { grid-template-columns: minmax(0, 1fr); } }

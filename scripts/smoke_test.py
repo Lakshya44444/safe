@@ -50,7 +50,8 @@ def main() -> int:
     check("Render Workflows hand-off", True if meta.get("workflows") else None, "set RENDER_WORKFLOW_SLUG to enable")
 
     for path in ("/", "/api/leaderboard", "/api/summary", "/api/issues", "/api/reports?limit=5",
-                 "/api/bhawans/Govind", "/qr.html", "/manifest.webmanifest", "/sw.js"):
+                 "/api/bhawans/Govind", "/qr.html", "/manifest.webmanifest", "/sw.js",
+                 "/api/collection-plan", "/api/forecast", "/api/compliance", "/report.html"):
         r = s.get(b + path, timeout=30)
         check(f"GET {path}", r.ok, str(r.status_code))
 
@@ -62,6 +63,10 @@ def main() -> int:
     check("grade a note with the LLM", r.status_code == 201 and rep.get("status") == "graded",
           f"grade={rep.get('grade')} items={rep.get('found_items')} by={rep.get('provider')} "
           f"in {time.time() - t:.1f}s {rep.get('error') or ''}")
+
+    if rep.get("id"):
+        v = s.post(f"{b}/api/reports/{rep['id']}/verdict", json={"agree": True}, timeout=30)
+        check("worker check of an AI grade", v.ok and v.json().get("verdict") == "agree")
 
     if args.photo:
         t = time.time()

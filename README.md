@@ -185,6 +185,19 @@ python -m unittest discover -s tests -t . -v
 | Anyone | Click a Bhawan for its own report card: clean rate per bin, weakest bin, daily trend, photo wall |
 | Students | Downloadable "Certificate of Clean Segregation" for a Bhawan, to share |
 | Sanitation worker | Hindi / English toggle; installable app that saves reports offline and sends them when back online |
+| Sanitation worker | 👍 / 👎 check on every AI grade, with a one-tap correct grade. The worker's grade counts; the AI's original grade is kept, so the dashboard shows live AI-worker agreement |
+| Collection team | "Collection order today": open complaints first (overflow and missed pickup weigh most, older ones more), then Bhawans with mixed bins to re-sort |
+| Warden | "Needs a nudge": a straight-line trend over each Bhawan's last 7 daily scores flags those heading below a B or falling 5+ points a day, with a one-tap voice briefing |
+| Estate office | Printable monthly SWM Rules 2026 compliance report (`/report.html`): stream-wise and Bhawan-wise segregation, complaints and fix times, compost and CO₂e estimates, method and limits |
+| Everyone | Estimated CO₂e avoided by composting clean wet waste instead of landfilling it |
+
+Why these, with sources:
+
+- **Worker check.** Vision-language models classify waste only moderately well (47–73% bin accuracy across models in a 2026 benchmark, [arXiv 2601.00905](https://arxiv.org/abs/2601.00905)), so the AI grade is a first pass that the person standing at the bin can confirm or correct. Corrections are kept as evaluation data.
+- **Daily feedback and nudges.** Segregation behaviour tends to slip back once campaigns stop; regular, specific feedback is the lever that keeps it up.
+- **Compliance report.** Under the SWM Rules 2026, campuses generating 100 kg or more of waste a day are bulk waste generators, responsible for segregation and on-site processing of wet waste, with reporting on a central online portal.
+- **CO₂e factor.** 0.98 kg CO₂e per kg = US EPA WARM v12 food scraps, landfilled (0.69) minus composted (−0.20) MTCO2E per short ton, converted to kg per kg. Indicative, not a certified figure.
+- **Cost.** A phone the worker already has and a printed QR sticker per bin, compared with ₹800–3,000 per bin for a fill-level sensor node.
 
 Problem-statement coverage: AI detection of wrongly segregated waste (area 1),
 overflow and missed-pickup reports (area 2), compost-ready wet waste (area 3),
@@ -290,10 +303,16 @@ tests/             unit, API and eval tests
 | POST | `/api/issues/{id}/resolve` | mark fixed |
 | GET | `/api/bhawans/{bhawan}?days=7` | one Bhawan's report card: rank, per-bin clean rates, trend, recent checks |
 | GET | `/api/llm/stats` | gateway calls, retries, repairs, tokens, latency |
+| POST | `/api/reports/{id}/verdict` | JSON `{"agree": true}` or `{"agree": false, "grade": "B"}` |
+| GET | `/api/collection-plan` | ordered list of Bhawans to visit first, with reasons |
+| GET | `/api/forecast?days=7` | per-Bhawan trend, expected next-day score, `needs_nudge` |
+| GET | `/api/compliance?days=30` | everything in the compliance report, with method and sources |
 
 ## Limits
 
 - SQLite on the web service: Render's free plan resets the disk on redeploy (demo data is re-seeded). Use Render Postgres or a disk for real use.
 - One photo shows the top layer only; items underneath can be missed.
-- The compost figure is an estimate (clean wet bins × an assumed 12 kg per bin).
+- The compost figure is an estimate (clean wet bins × an assumed 12 kg per bin); the CO₂e figure inherits that assumption.
+- The forecast is a straight line through at most two weeks of daily scores: a prompt to look, not a prediction to plan around.
+- The collection order is a priority list, not a route (no GPS on bins).
 - IIT Roorkee waste figures in the pitch come from a 2020 campus report and may have changed.

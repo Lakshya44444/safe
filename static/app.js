@@ -132,8 +132,31 @@ async function loadBoard() {
   drawTrend($("#trend"), sum.daily);
   drawStreams(sum.by_stream);
   loadIssues();
+  loadPlan();
   $("#recent").innerHTML = renderWall(recent);
 }
+
+async function loadPlan() {
+  const [plan, fc] = await Promise.all([
+    api("/api/collection-plan").catch(() => []),
+    api("/api/forecast?days=7").catch(() => []),
+  ]);
+  $("#plan").innerHTML = plan.length ? plan.slice(0, 6).map((p) => {
+    const why = p.reasons.map((r) => `${ISSUE_KEY[r.kind] ? t(ISSUE_KEY[r.kind]) : esc(r.kind)} · ${t("plan.hours", { h: Math.round(r.hours_open) })}`);
+    if (p.mixed_bins_today) why.push(t(p.mixed_bins_today === 1 ? "plan.mixed1" : "plan.mixed", { n: p.mixed_bins_today }));
+    return `<li><span class="plan-n">${p.order}</span><div><b>${esc(p.bhawan)}</b><small>${why.map(esc).join("<br>")}</small></div></li>`;
+  }).join("") : `<li class="empty">${t("plan.empty")}</li>`;
+  const sliding = fc.filter((f) => f.needs_nudge);
+  $("#nudge").innerHTML = sliding.length ? sliding.slice(0, 6).map((f) => `
+    <li><b>${esc(f.bhawan)}</b><span class="nudge-grade g-${letter(f.tomorrow)}">${letter(f.tomorrow)}</span>
+      <small>${t("nudge.line", { last: f.last, tomorrow: f.tomorrow, slope: f.slope_per_day > 0 ? "+" + f.slope_per_day : f.slope_per_day })}</small>
+      <button class="play-mini" data-b="${esc(f.bhawan)}" type="button">${PLAY_SVG}<span>${LANG === "hi" ? "वार्डन ब्रीफ़िंग" : "Warden briefing"}</span></button></li>`).join("")
+    : `<li class="empty">${t("nudge.empty")}</li>`;
+}
+$("#nudge").addEventListener("click", (e) => {
+  const b = e.target.closest(".play-mini");
+  if (b) playBriefing(b, b.dataset.b);
+});
 
 $$(".range button").forEach((b) => b.addEventListener("click", () => {
   days = Number(b.dataset.days);
@@ -173,12 +196,15 @@ function renderHero(today, week, rows) {
   }
 
   const fix = week.issues.avg_hours_to_fix;
+  const wc = week.worker_checks || {};
   const hi = LANG === "hi";
   const n = week.reports.toLocaleString("en-IN");
   $("#marks").innerHTML = `
     <div class="mark"><dd>${week.segregation_rate}%</dd><dt>${hi ? "डब्बे साफ़" : "bins clean"}</dt><small>${hi ? `${n} जाँचे गए` : `${n} checked in ${week.days === 1 ? "a day" : week.days + " days"}`}</small></div>
     <div class="mark"><dd>~${week.compost_kg_estimate.toLocaleString("en-IN")} kg</dd><dt>${hi ? "खाद के लायक" : "ready for compost"}</dt><small>${hi ? "अनुमान" : "estimate"}: ${week.wet_bins_compost_ready} × ${week.kg_per_wet_bin} kg</small></div>
-    <div class="mark"><dd>${week.issues.open}</dd><dt>${hi ? "खुली शिकायतें" : "open complaints"}</dt><small>${fix != null ? (hi ? `औसतन ${fix} घंटे में ठीक` : `fixed in ${fix} h on average`) : ""}</small></div>`;
+    <div class="mark"><dd>${week.issues.open}</dd><dt>${hi ? "खुली शिकायतें" : "open complaints"}</dt><small>${fix != null ? (hi ? `औसतन ${fix} घंटे में ठीक` : `fixed in ${fix} h on average`) : ""}</small></div>
+    <div class="mark"><dd>~${(week.co2e_kg_avoided_estimate ?? 0).toLocaleString("en-IN")}</dd><dt>${t("mark.co2")}</dt><small>${t("mark.co2.note")}</small></div>
+    <div class="mark"><dd>${wc.agreement_rate == null ? "–" : wc.agreement_rate + "%"}</dd><dt>${t("mark.agree")}</dt><small>${wc.checked ? t("mark.agree.note", { n: wc.checked }) : t("mark.agree.none")}</small></div>`;
 
   const cert = $("#hero-cert");
   cert.hidden = !topRow;
@@ -598,9 +624,40 @@ function showResult(r, was, now) {
       <p class="meta">${esc(share)}</p>
       ${rank}
     </div>
+    <div class="verdict" id="verdict">${verdictHtml(r)}</div>
     <button class="again" type="button">${t("again")}</button>`;
   res.querySelector(".again").onclick = resetForm;
+  wireVerdict(r);
   if (window.matchMedia("(max-width: 860px)").matches) res.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Worker check: one tap to agree, or pick the right grade. The model's grade is kept for evaluation.
+function verdictHtml(r) {
+  if (r.verdict === "agree") return `<p class="verdict-done">✓ ${t("verdict.thanks")}</p>`;
+  if (r.verdict === "disagree") return `<p class="verdict-done">✓ ${t("verdict.fixed", { g: r.grade })}</p>`;
+  return `<p class="verdict-q">${t("verdict.ask")}</p>
+    <div class="verdict-row"><button type="button" data-v="yes">👍 ${t("verdict.yes")}</button><button type="button" data-v="no">👎 ${t("verdict.no")}</button></div>
+    <div class="verdict-pick" hidden><p>${t("verdict.pick")}</p><div class="verdict-row">${["A", "B", "C"].filter((g) => g !== r.grade)
+      .map((g) => `<button type="button" class="g-${g}" data-g="${g}">${g}</button>`).join("")}</div></div>`;
+}
+function wireVerdict(r) {
+  const box = $("#verdict");
+  if (!box || r.verdict) return;
+  box.onclick = async (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    if (btn.dataset.v === "no") { box.querySelector(".verdict-pick").hidden = false; return; }
+    const body = btn.dataset.v === "yes" ? { agree: true } : { agree: false, grade: btn.dataset.g };
+    box.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    try {
+      const upd = await api(`/api/reports/${r.id}/verdict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (body.agree) { lastResult[0] = upd; box.innerHTML = verdictHtml(upd); }
+      else showResult(upd, lastResult[1], lastResult[2]);
+    } catch (err) {
+      box.querySelectorAll("button").forEach((b) => (b.disabled = false));
+      showBanner(err.message);
+    }
+  };
 }
 
 function showOfflineSaved() {
