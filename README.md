@@ -182,6 +182,9 @@ python -m unittest discover -s tests -t . -v
 | Students, warden | Bhawan leaderboard, daily trend, clean rate per bin type, most common wrong items |
 | Warden | Daily voice briefing per Bhawan ("Listen") |
 | Estate office | Open complaints, average fix time, compost estimate |
+| Anyone | Click a Bhawan for its own report card: clean rate per bin, weakest bin, daily trend, photo wall |
+| Students | Downloadable "Certificate of Clean Segregation" for a Bhawan, to share |
+| Sanitation worker | Hindi / English toggle; installable app that saves reports offline and sends them when back online |
 
 Problem-statement coverage: AI detection of wrongly segregated waste (area 1),
 overflow and missed-pickup reports (area 2), compost-ready wet waste (area 3),
@@ -264,6 +267,7 @@ tests/             unit, API and eval tests
 | POST | `/api/issues` | `bhawan`, `kind`, `note` |
 | GET | `/api/issues?status=open` | open complaints |
 | POST | `/api/issues/{id}/resolve` | mark fixed |
+| GET | `/api/bhawans/{bhawan}?days=7` | one Bhawan's report card: rank, per-bin clean rates, trend, recent checks |
 | GET | `/api/llm/stats` | gateway calls, retries, repairs, tokens, latency |
 
 ## Limits

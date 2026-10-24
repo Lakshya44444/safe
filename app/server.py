@@ -159,6 +159,15 @@ async def summary(request: Request):
     return JSONResponse(scoring.campus_summary(int_param(request, "days", 7, 1, 90)))
 
 
+async def bhawan_detail(request: Request):
+    bhawan = match_bhawan(request.path_params["bhawan"])
+    if not bhawan:
+        return fail("Unknown Bhawan", 404)
+    detail = scoring.bhawan_detail(bhawan, int_param(request, "days", 7, 1, 90))
+    detail["recent"] = [public_report(r) for r in db.list_reports(12, bhawan)]
+    return JSONResponse(detail)
+
+
 async def briefing(request: Request):
     bhawan = match_bhawan(request.path_params["bhawan"])
     if not bhawan:
@@ -312,6 +321,7 @@ routes = [
     Route("/api/audio/{name}", audio),
     Route("/api/leaderboard", leaderboard),
     Route("/api/summary", summary),
+    Route("/api/bhawans/{bhawan}", bhawan_detail),
     Route("/api/briefing/{bhawan}", briefing),
     Route("/api/transcribe", transcribe, methods=["POST"]),
     Route("/api/issues", create_issue, methods=["POST"]),

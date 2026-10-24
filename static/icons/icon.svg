@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#f5f8fc"/>
+  <g transform="rotate(-9 256 256)" fill="none" stroke="#1f8a55">
+    <circle cx="256" cy="256" r="176" stroke-width="26"/>
+    <circle cx="256" cy="256" r="146" stroke-width="10"/>
+  </g>
+  <text x="256" y="320" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="200" fill="#1f8a55" transform="rotate(-9 256 256)">A</text>
+</svg>

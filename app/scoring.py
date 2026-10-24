@@ -89,3 +89,37 @@ def campus_summary(days: int = 7) -> dict:
         "issues": db.issue_stats(since),
         "daily": daily,
     }
+
+
+def bhawan_detail(bhawan: str, days: int = 7) -> dict:
+    """One Bhawan's report card: rank, per-bin clean rates, daily trend and recent checks."""
+    rows = bhawan_scores(days)
+    row = next((r for r in rows if r["bhawan"] == bhawan), None)
+    reports = [r for r in db.graded_since(window_start(days)) if r["bhawan"] == bhawan]
+
+    by_day: dict[str, list[dict]] = defaultdict(list)
+    for r in reports:
+        by_day[local_day(r["created_at"])].append(r)
+    by_stream = {}
+    for s in config.STREAMS:
+        rs = [r for r in reports if r["bin_stream"] == s]
+        by_stream[s] = {
+            "reports": len(rs),
+            "clean_rate": round(100 * sum(r["grade"] == "A" for r in rs) / len(rs)) if rs else None,
+            "top_wrong_items": [n for n, _ in Counter(i for r in rs for i in r["found_items"]).most_common(3)],
+        }
+    worst = min((s for s in by_stream if by_stream[s]["reports"]),
+                key=lambda s: by_stream[s]["clean_rate"], default=None)
+    return {
+        "bhawan": bhawan,
+        "days": days,
+        "rank": row["rank"] if row else None,
+        "of": len(rows),
+        "score": row["score"] if row else None,
+        "grades": row["grades"] if row else {"A": 0, "B": 0, "C": 0},
+        "reports": len(reports),
+        "trend": row["trend"] if row else None,
+        "by_stream": by_stream,
+        "worst_stream": worst,
+        "daily": [{"date": d, "score": round(_avg_points(rs)), "reports": len(rs)} for d, rs in sorted(by_day.items())],
+    }

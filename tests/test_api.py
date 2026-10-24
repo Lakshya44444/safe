@@ -102,6 +102,15 @@ class Api(unittest.TestCase):
                                                                "content-type": "application/json"})
         self.assertEqual(r.status_code, 413)
 
+    def test_bhawan_detail(self):
+        self.c.post("/api/reports?wait=1", data={"bhawan": "Cautley", "bin_stream": "wet", "note": "plastic bag"})
+        d = self.c.get("/api/bhawans/cautley").json()
+        self.assertEqual(d["bhawan"], "Cautley")
+        self.assertEqual(set(d["by_stream"]), {"wet", "dry", "sanitary", "special_care"})
+        self.assertEqual(d["worst_stream"], "wet")
+        self.assertTrue(d["recent"] and d["daily"])
+        self.assertEqual(self.c.get("/api/bhawans/nowhere").status_code, 404)
+
     def test_briefing_and_dashboard(self):
         b = self.c.get("/api/briefing/Govind").json()
         self.assertTrue(b["text"].startswith("Good evening"))
