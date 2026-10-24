@@ -1,47 +1,57 @@
-"""Bhawan Segregation Score and the leaderboard.
+"""Bhawan segregation scores, the leaderboard and campus summary.
 
 Score = average grade points (A=100, B=60, C=20) over the window.
-Trend compares the latest day with the days before it.
+Days are counted in campus time (config.TIMEZONE), so "today" matches what people on campus see.
 """
 
-from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from __future__ import annotations
+
+from collections import Counter, defaultdict
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from . import config, db
 
+TZ = ZoneInfo(config.TIMEZONE)
 
-def _since(days: int) -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+
+def local_day(iso: str) -> str:
+    """Campus-time date of a stored UTC timestamp."""
+    return datetime.fromisoformat(iso).astimezone(TZ).date().isoformat()
+
+
+def window_start(days: int, now: datetime | None = None) -> str:
+    """UTC ISO timestamp of local midnight `days - 1` days ago: days=1 means 'today'."""
+    now = (now or datetime.now(timezone.utc)).astimezone(TZ)
+    start = datetime.combine(now.date() - timedelta(days=days - 1), time.min, tzinfo=TZ)
+    return start.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def _avg_points(rs: list[dict]) -> float:
+    return sum(config.GRADE_POINTS[r["grade"]] for r in rs) / len(rs)
 
 
 def bhawan_scores(days: int = 7) -> list[dict]:
-    reports = db.graded_since(_since(days))
+    reports = db.graded_since(window_start(days))
+    today = datetime.now(TZ).date().isoformat()
     by_bhawan: dict[str, list[dict]] = defaultdict(list)
     for r in reports:
         by_bhawan[r["bhawan"]].append(r)
 
-    today = datetime.now(timezone.utc).date().isoformat()
     rows = []
     for bhawan, rs in by_bhawan.items():
-        pts = [config.GRADE_POINTS[r["grade"]] for r in rs]
-        today_pts = [config.GRADE_POINTS[r["grade"]] for r in rs if r["created_at"][:10] == today]
-        before_pts = [config.GRADE_POINTS[r["grade"]] for r in rs if r["created_at"][:10] != today]
-        item_counts: dict[str, int] = defaultdict(int)
-        for r in rs:
-            for it in r["found_items"]:
-                item_counts[it] += 1
-        top_items = sorted(item_counts, key=item_counts.get, reverse=True)[:3]
-        trend = None
-        if today_pts and before_pts:
-            trend = round(sum(today_pts) / len(today_pts) - sum(before_pts) / len(before_pts))
+        todays = [r for r in rs if local_day(r["created_at"]) == today]
+        earlier = [r for r in rs if local_day(r["created_at"]) != today]
+        items = Counter(item for r in rs for item in r["found_items"])
         rows.append({
             "bhawan": bhawan,
-            "score": round(sum(pts) / len(pts)),
+            "score": round(_avg_points(rs)),
             "reports": len(rs),
-            "grades": {g: sum(1 for r in rs if r["grade"] == g) for g in ("A", "B", "C")},
+            "grades": {g: sum(r["grade"] == g for r in rs) for g in ("A", "B", "C")},
             "avg_contamination": round(sum(r["contamination"] for r in rs) / len(rs)),
-            "top_wrong_items": top_items,
-            "trend": trend,
+            "top_wrong_items": [name for name, _ in items.most_common(3)],
+            # Today's average minus the rest of the window; None when either side is empty.
+            "trend": round(_avg_points(todays) - _avg_points(earlier)) if todays and earlier else None,
         })
     rows.sort(key=lambda x: (-x["score"], -x["reports"], x["bhawan"]))
     for i, row in enumerate(rows, 1):
@@ -50,29 +60,32 @@ def bhawan_scores(days: int = 7) -> list[dict]:
 
 
 def campus_summary(days: int = 7) -> dict:
-    reports = db.graded_since(_since(days))
+    since = window_start(days)
+    reports = db.graded_since(since)
     n = len(reports)
-    clean = sum(1 for r in reports if r["grade"] == "A")
-    wet_clean = sum(1 for r in reports if r["bin_stream"] == "wet" and r["grade"] == "A")
-    by_day: dict[str, list[int]] = defaultdict(list)
+    clean = sum(r["grade"] == "A" for r in reports)
+    wet_clean = sum(r["bin_stream"] == "wet" and r["grade"] == "A" for r in reports)
+
+    by_day: dict[str, list[dict]] = defaultdict(list)
     for r in reports:
-        by_day[r["created_at"][:10]].append(config.GRADE_POINTS[r["grade"]])
-    daily = [{"date": d, "score": round(sum(v) / len(v)), "reports": len(v)}
-             for d, v in sorted(by_day.items())]
+        by_day[local_day(r["created_at"])].append(r)
+    daily = [{"date": d, "score": round(_avg_points(rs)), "reports": len(rs)} for d, rs in sorted(by_day.items())]
+
     by_stream = {}
     for s in config.STREAMS:
         rs = [r for r in reports if r["bin_stream"] == s]
         by_stream[s] = {"reports": len(rs),
-                        "clean_rate": round(100 * sum(1 for r in rs if r["grade"] == "A") / len(rs)) if rs else None}
+                        "clean_rate": round(100 * sum(r["grade"] == "A" for r in rs) / len(rs)) if rs else None}
+
     return {
         "days": days,
         "reports": n,
         "segregation_rate": round(100 * clean / n) if n else 0,
         "wet_bins_compost_ready": wet_clean,
-        # Estimate only: clean wet bins x assumed fill weight (KG_PER_WET_BIN, default 12 kg).
+        # Estimate only: clean wet bins x assumed weight per bin (KG_PER_WET_BIN).
         "compost_kg_estimate": round(wet_clean * config.KG_PER_WET_BIN),
         "kg_per_wet_bin": config.KG_PER_WET_BIN,
         "by_stream": by_stream,
-        "issues": db.issue_stats(_since(days)),
+        "issues": db.issue_stats(since),
         "daily": daily,
     }

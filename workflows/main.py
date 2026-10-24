@@ -45,7 +45,10 @@ def grade_bin_task(ctx: TaskContext, photo_b64: str | None, mime: str | None,
             fd, path = tempfile.mkstemp(suffix=_EXT.get(mime or "", ".jpg"))
             with os.fdopen(fd, "wb") as f:
                 f.write(base64.b64decode(photo_b64))
-        result = grader.grade_bin(path, stream, note)
+        try:
+            result = grader.grade_bin(path, stream, note)
+        except grader.UnreadableBinError as e:
+            return {"unreadable": str(e)}  # the worker must retake the photo; retrying won't help
         log.info("graded %s bin: %s (%s%%) via %s", stream, result.grade, result.contamination, result.provider)
         return result.to_dict()
     finally:

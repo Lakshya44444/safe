@@ -2,13 +2,25 @@
 
 from tests import _env  # noqa: F401  (must be first)
 
+import io
+import threading
+import time
 import unittest
 
+from PIL import Image
 from starlette.testclient import TestClient
 
+from app.llm_gateway import LLMGateway, LLMResponse, get_gateway, reset_gateway
 from app.server import app
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+def png_bytes(size=(64, 48)) -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", size, (40, 140, 80)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+PNG = png_bytes()
 
 
 class Api(unittest.TestCase):
@@ -40,6 +52,7 @@ class Api(unittest.TestCase):
                         files={"photo": ("bin.png", PNG, "image/png")})
         self.assertEqual(r.status_code, 201, r.text)
         url = r.json()["photo_url"]
+        self.assertTrue(url.endswith(".jpg"))  # normalised to JPEG whatever was uploaded
         self.assertEqual(self.c.get(url).status_code, 200)
 
     def test_rejects_non_image_upload(self):
@@ -78,6 +91,17 @@ class Api(unittest.TestCase):
                                                                                 "note": "pickup missed"}).json()["say"])
         self.assertIn("Indira", self.c.post("/api/agent/score", json={"bhawan": "indira"}).json()["say"])
 
+    def test_corrupt_image_rejected(self):
+        r = self.c.post("/api/reports", data={"bhawan": "Rajiv", "bin_stream": "dry"},
+                        files={"photo": ("x.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 40, "image/png")})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("could not be read", r.json()["error"])
+
+    def test_oversized_request_rejected_before_reading(self):
+        r = self.c.post("/api/issues", content=b"{}", headers={"content-length": str(50 * 1024 * 1024),
+                                                               "content-type": "application/json"})
+        self.assertEqual(r.status_code, 413)
+
     def test_briefing_and_dashboard(self):
         b = self.c.get("/api/briefing/Govind").json()
         self.assertTrue(b["text"].startswith("Good evening"))
@@ -85,6 +109,34 @@ class Api(unittest.TestCase):
         self.assertIn("segregation_rate", self.c.get("/api/summary").json())
         self.assertIsInstance(self.c.get("/api/leaderboard").json(), list)
         self.assertIn("chain", self.c.get("/api/llm/stats").json())
+
+
+class NonBlocking(unittest.TestCase):
+    """A slow LLM call must not freeze the server for everyone else."""
+
+    def test_other_requests_answer_while_grading(self):
+        class Slow:
+            name, model = "slow", "slow"
+
+            def complete(self, req):
+                time.sleep(1.5)
+                return LLMResponse(text='{"contamination_pct": 5}', provider="slow", model="slow")
+
+        previous = get_gateway()
+        reset_gateway(LLMGateway([Slow()]))
+        try:
+            with TestClient(app) as c:
+                t = threading.Thread(target=lambda: c.post("/api/reports?wait=1", data={
+                    "bhawan": "Azad", "bin_stream": "wet", "note": "clean"}))
+                t.start()
+                time.sleep(0.3)
+                t0 = time.perf_counter()
+                self.assertEqual(c.get("/api/health").status_code, 200)
+                elapsed = time.perf_counter() - t0
+                t.join()
+            self.assertLess(elapsed, 0.5)
+        finally:
+            reset_gateway(previous)
 
 
 if __name__ == "__main__":

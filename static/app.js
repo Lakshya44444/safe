@@ -34,8 +34,17 @@ let pickedStream = null;
 
 /* ---------- helpers ---------- */
 
-async function api(path, opts) {
-  const r = await fetch(API + path, opts);
+async function api(path, opts = {}, timeoutMs = 60000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let r;
+  try {
+    r = await fetch(API + path, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? "The server took too long. Try again." : "No connection to the server.");
+  } finally {
+    clearTimeout(timer);
+  }
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `Server error ${r.status}`);
   return data;

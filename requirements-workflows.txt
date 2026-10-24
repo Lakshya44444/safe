@@ -1,4 +1,5 @@
 render>=1.4
 requests>=2.31
 pydantic>=2.6
+Pillow>=10.0
 langsmith>=0.3

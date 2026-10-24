@@ -32,14 +32,15 @@ def match_bhawan(name: str | None) -> str | None:
     """'govind', 'Govind Bhawan', 'GOVIND hostel' -> 'Govind'."""
     if not name:
         return None
-    n = _BHAWAN_WORDS.sub("", name.lower()).strip()
+    n = " ".join(_BHAWAN_WORDS.sub("", name.lower()).split())
     if len(n) < 3:
         return None
     for b in config.BHAWANS:
-        bl = b.lower()
-        if n == bl or bl.startswith(n) or n.startswith(bl):
+        if n == b.lower():
             return b
-    return None
+    # A prefix ("raj") must point to exactly one Bhawan; "raj" could be Rajendra or Rajiv.
+    hits = [b for b in config.BHAWANS if b.lower().startswith(n) or n.startswith(b.lower())]
+    return hits[0] if len(hits) == 1 else None
 
 
 def match_stream(name: str | None) -> str | None:

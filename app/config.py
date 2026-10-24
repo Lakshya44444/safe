@@ -62,6 +62,10 @@ GRADE_POINTS = {"A": 100, "B": 60, "C": 20}
 KG_PER_WET_BIN = float(os.getenv("KG_PER_WET_BIN", "12"))
 
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+# Each report costs an LLM call: cap writes per client IP per minute.
+WRITES_PER_MINUTE = int(os.getenv("WRITES_PER_MINUTE", "30"))
+# Days, "today" and trends are counted in campus time, not UTC.
+TIMEZONE = os.getenv("TIMEZONE", "Asia/Kolkata")
 
 
 def ensure_dirs() -> None:

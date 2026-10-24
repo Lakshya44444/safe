@@ -34,6 +34,8 @@ def _grade_on_render(report: dict) -> GradeResult:
         {"photo_b64": photo_b64, "mime": mime, "stream": report["bin_stream"], "note": report["note"]},
     )
     result = run.results[0] if isinstance(run.results, list) else run.results
+    if "unreadable" in result:
+        raise grader.UnreadableBinError(result["unreadable"])
     return GradeResult(**result)
 
 

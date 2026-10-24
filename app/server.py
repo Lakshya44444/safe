@@ -13,6 +13,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
 from starlette.applications import Starlette
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
@@ -22,15 +23,15 @@ from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import config, db, pipeline, scoring, voice
+from . import config, db, images, pipeline, scoring, voice
 from .llm_gateway import get_gateway
 from .matching import match_bhawan, match_issue_kind, match_stream
+from .ratelimit import WriteGuard
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("kachra.api")
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
-IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 # ---------- helpers ----------
@@ -51,7 +52,7 @@ def int_param(request: Request, name: str, default: int, lo: int, hi: int) -> in
     try:
         return max(lo, min(int(request.query_params.get(name, default)), hi))
     except ValueError:
-        raise HTTPException(400, f"{name} must be a number")
+        raise HTTPException(400, f"{name} must be a number") from None
 
 
 async def read_upload(f: UploadFile) -> bytes:
@@ -59,11 +60,6 @@ async def read_upload(f: UploadFile) -> bytes:
     if len(data) > config.MAX_UPLOAD_BYTES:
         raise HTTPException(413, "File must be smaller than 8 MB")
     return data
-
-
-def _is_image(data: bytes) -> bool:
-    return (data.startswith(b"\xff\xd8\xff") or data.startswith(b"\x89PNG\r\n\x1a\n")
-            or (data[:4] == b"RIFF" and data[8:12] == b"WEBP"))
 
 
 # ---------- basic ----------
@@ -111,11 +107,12 @@ async def _create_report(request: Request, form):
     photo = form.get("photo")
     if isinstance(photo, UploadFile) and photo.filename:
         data = await read_upload(photo)
-        if not _is_image(data):
-            return fail("The photo must be a JPEG, PNG or WebP image.")
-        ext = Path(photo.filename).suffix.lower()
+        try:
+            data, mime = await run_in_threadpool(images.normalise, data)
+        except images.BadImage as e:
+            return fail(str(e))
         config.ensure_dirs()
-        p = config.UPLOAD_DIR / f"{uuid.uuid4().hex}{ext if ext in IMAGE_EXTS else '.jpg'}"
+        p = config.UPLOAD_DIR / f"{uuid.uuid4().hex}{images.EXT[mime]}"
         p.write_bytes(data)
         photo_path = str(p)
 
@@ -124,7 +121,9 @@ async def _create_report(request: Request, form):
 
     rid = db.create_report(bhawan, stream, reporter, note, photo_path)
     if request.query_params.get("wait") == "1":
-        return JSONResponse(public_report(pipeline.process_report(rid)), status_code=201)
+        # Grading calls an LLM (seconds): run it in a worker thread so other requests aren't blocked.
+        report = await run_in_threadpool(pipeline.process_report, rid)
+        return JSONResponse(public_report(report), status_code=201)
     pipeline.process_in_background(rid)
     return JSONResponse(public_report(db.get_report(rid)), status_code=202)
 
@@ -170,7 +169,8 @@ async def briefing(request: Request):
     out: dict = {"bhawan": bhawan, "text": text, "audio_url": None}
     if voice.tts_available():
         try:
-            out["audio_url"] = f"/api/audio/{Path(voice.synthesize(text)).name}"
+            path = await run_in_threadpool(voice.synthesize, text)
+            out["audio_url"] = f"/api/audio/{Path(path).name}"
         except voice.VoiceError as e:
             log.warning("briefing TTS failed: %s", e)
             out["tts_error"] = str(e)[:200]
@@ -184,7 +184,8 @@ async def transcribe(request: Request):
             return fail("Send the recording as 'audio'.")
         data = await read_upload(f)
     try:
-        return JSONResponse({"text": voice.transcribe(data, f.filename or "note.webm", f.content_type)})
+        text = await run_in_threadpool(voice.transcribe, data, f.filename or "note.webm", f.content_type)
+        return JSONResponse({"text": text})
     except voice.VoiceError as e:
         return fail(str(e), 502)
 
@@ -265,7 +266,7 @@ async def agent_report(request: Request):
     if not body.note.strip():
         return JSONResponse({"ok": False, "say": "What did you see inside the bin?"})
     rid = db.create_report(bhawan, stream, body.reporter, body.note.strip(), None)
-    r = pipeline.process_report(rid)
+    r = await run_in_threadpool(pipeline.process_report, rid)
     if r["status"] != "graded":
         return JSONResponse({"ok": False, "say": r.get("error") or "Saved, but it could not be graded."})
     return JSONResponse({"ok": True, "report_id": rid, "grade": r["grade"],
@@ -333,7 +334,10 @@ async def lifespan(app):
 
 app = Starlette(
     routes=routes,
-    middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])],
+    middleware=[
+        Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]),
+        Middleware(WriteGuard, max_body=config.MAX_UPLOAD_BYTES + 64 * 1024, per_minute=config.WRITES_PER_MINUTE),
+    ],
     exception_handlers={HTTPException: http_error},
     lifespan=lifespan,
 )
