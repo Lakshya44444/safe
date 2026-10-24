@@ -142,7 +142,9 @@ async function loadPlan() {
     api("/api/forecast?days=7").catch(() => []),
   ]);
   $("#plan").innerHTML = plan.length ? plan.slice(0, 6).map((p) => {
-    const why = p.reasons.map((r) => `${ISSUE_KEY[r.kind] ? t(ISSUE_KEY[r.kind]) : esc(r.kind)} · ${t("plan.hours", { h: Math.round(r.hours_open) })}`);
+    const why = p.reasons.map((r) => r.kind === "hazard"
+      ? `⚠️ ${t("plan.hazard", { items: r.items.map((x) => (LANG === "hi" ? ITEM_HI[x] || x : x)).join(", "), bin: streamName(r.bin_stream) })}`
+      : `${ISSUE_KEY[r.kind] ? t(ISSUE_KEY[r.kind]) : esc(r.kind)} · ${t("plan.hours", { h: Math.round(r.hours_open) })}`);
     if (p.mixed_bins_today) why.push(t(p.mixed_bins_today === 1 ? "plan.mixed1" : "plan.mixed", { n: p.mixed_bins_today }));
     return `<li><span class="plan-n">${p.order}</span><div><b>${esc(p.bhawan)}</b><small>${why.map(esc).join("<br>")}</small></div></li>`;
   }).join("") : `<li class="empty">${t("plan.empty")}</li>`;
@@ -203,6 +205,7 @@ function renderHero(today, week, rows) {
     <div class="mark"><dd>${week.segregation_rate}%</dd><dt>${hi ? "डब्बे साफ़" : "bins clean"}</dt><small>${hi ? `${n} जाँचे गए` : `${n} checked in ${week.days === 1 ? "a day" : week.days + " days"}`}</small></div>
     <div class="mark"><dd>~${week.compost_kg_estimate.toLocaleString("en-IN")} kg</dd><dt>${hi ? "खाद के लायक" : "ready for compost"}</dt><small>${hi ? "अनुमान" : "estimate"}: ${week.wet_bins_compost_ready} × ${week.kg_per_wet_bin} kg</small></div>
     <div class="mark"><dd>${week.issues.open}</dd><dt>${hi ? "खुली शिकायतें" : "open complaints"}</dt><small>${fix != null ? (hi ? `औसतन ${fix} घंटे में ठीक` : `fixed in ${fix} h on average`) : ""}</small></div>
+    <div class="mark mark-hazard${(week.hazards?.bins || 0) ? " on" : ""}"><dd>${week.hazards?.bins ?? 0}</dd><dt>${t("mark.hazard")}</dt><small>${week.hazards?.top_items?.length ? esc(week.hazards.top_items.map((x) => (hi ? ITEM_HI[x] || x : x)).join(", ")) : t("mark.hazard.none")}</small></div>
     <div class="mark"><dd>~${(week.co2e_kg_avoided_estimate ?? 0).toLocaleString("en-IN")}</dd><dt>${t("mark.co2")}</dt><small>${t("mark.co2.note")}</small></div>
     <div class="mark"><dd>${wc.agreement_rate == null ? "–" : wc.agreement_rate + "%"}</dd><dt>${t("mark.agree")}</dt><small>${wc.checked ? t("mark.agree.note", { n: wc.checked }) : t("mark.agree.none")}</small></div>`;
 
@@ -623,8 +626,16 @@ function showResult(r, was, now) {
     return;
   }
   const message = feedback(r).replace(/^(Good job!|Oops!|Needs attention:|शाबाश!|ओह!|ध्यान दें:)\s*/, "");
-  const items = r.found_items?.length
-    ? `<ul class="items">${r.found_items.map((x) => `<li>${esc(LANG === "hi" ? ITEM_HI[x] || x : x)}</li>`).join("")}</ul>` : "";
+  const hi = LANG === "hi";
+  const ids = r.identified || (r.found_items || []).map((x) => ({ item: x, belongs: null, hazard: false }));
+  const danger = ids.filter((x) => x.hazard);
+  const alarm = danger.length ? `<div class="hazard"><b>⚠️ ${t("hazard.title")}</b>
+      <ul>${danger.map((x) => `<li><b>${esc(hi ? ITEM_HI[x.item] || x.item : x.item)}</b>: ${esc(hi ? t("hazard.why." + hazardKey(x.why)) : x.why)}</li>`).join("")}</ul>
+      <p>${t("hazard.do")}</p></div>` : "";
+  const items = ids.length ? `<p class="id-head">${t("id.title")}</p><ul class="ident">${ids.map((x) => `
+      <li class="${x.hazard ? "danger" : ""}"><span>${x.hazard ? "⚠️ " : ""}${esc(hi ? ITEM_HI[x.item] || x.item : x.item)}</span>
+        <span class="arrow">→</span>
+        ${x.belongs ? `<span class="to" style="--c:${STREAM_COLOR[x.belongs]}">${BIN_SVG(x.belongs)}${streamName(x.belongs)}</span>` : `<span class="to unsure">${t("id.unsure")}</span>`}</li>`).join("")}</ul>` : "";
   const moved = was && now && was !== now;
   const rank = now ? `<p class="rank-move ${moved ? (now < was ? "up" : "down") : ""}">${
     t(moved ? "rank.moved" : "rank.same", { b: r.bhawan, now, was })}</p>` : "";
@@ -637,6 +648,7 @@ function showResult(r, was, now) {
         <div class="tag-word">${t("grade." + r.grade)}</div>
       </div>
       <p>${esc(message)}</p>
+      ${alarm}
       ${items}
       <p class="meta">${esc(share)}</p>
       ${rank}
@@ -646,6 +658,17 @@ function showResult(r, was, now) {
   res.querySelector(".again").onclick = resetForm;
   wireVerdict(r);
   if (window.matchMedia("(max-width: 860px)").matches) res.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function hazardKey(why) {
+  if (!why) return "other";
+  if (why.startsWith("sharps")) return "sharps";
+  if (why.includes("fire")) return "fire";
+  if (why.includes("mercury")) return "mercury";
+  if (why.includes("drugs")) return "drugs";
+  if (why.includes("toxic")) return "toxic";
+  if (why.includes("infection")) return "infection";
+  return "other";
 }
 
 // Worker check: one tap to agree, or pick the right grade. The model's grade is kept for evaluation.

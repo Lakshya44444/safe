@@ -478,3 +478,19 @@ a { color: inherit; }
 .chat-form input { flex: 1; min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 .75rem; background: var(--paper); color: var(--ink); font: inherit; }
 .chat-form button { border: 0; background: var(--ink); color: var(--paper-2); border-radius: 12px; padding: 0 1rem; font-weight: 700; cursor: pointer; }
 .foot { padding-bottom: 9rem; }
+
+/* ---- identification + hazards ---- */
+.id-head { margin: .9rem 0 .35rem; font-weight: 700; font-size: .92rem; }
+.ident { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; }
+.ident li { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: .4rem .6rem; font-size: .92rem; }
+.ident li.danger { border-color: var(--pen); background: color-mix(in srgb, var(--pen) 8%, var(--paper-2)); font-weight: 600; }
+.ident .arrow { color: var(--ink-soft); }
+.ident .to { display: inline-flex; align-items: center; gap: .25rem; font-weight: 700; color: var(--c); }
+.ident .to svg { width: 16px; height: 19px; }
+.ident .to.unsure { color: var(--ink-soft); font-weight: 500; font-style: italic; }
+.hazard { margin: .8rem 0; padding: .75rem .9rem; border-radius: 12px; background: var(--pen); color: #fff; }
+.hazard b { font-size: 1.02rem; }
+.hazard ul { margin: .35rem 0; padding-left: 1.1rem; }
+.hazard p { margin: .3rem 0 0; font-size: .88rem; opacity: .95; }
+.mark-hazard.on { outline: 2px solid var(--pen); }
+.mark-hazard.on dd { color: var(--pen); }

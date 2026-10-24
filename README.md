@@ -94,6 +94,8 @@ on each bin.
 | Feature | What it does |
 | --- | --- |
 | **Check a bin** | Pick Bhawan and bin, take a photo from above and/or speak a note. A stamped grade appears in about five seconds. |
+| **Item identification** | Every item the AI names is shown with the bin it belongs in ("battery → Special care", "food scraps → Wet"). Items not in the sorting table say "not sure, ask staff" instead of a guess. |
+| **⚠️ Hazard alert** | If a dangerous item is in the wrong bin (sharps, batteries, CFLs, medicines, paint, diapers/pads outside the sanitary bin), a red alert says why it is dangerous and tells the worker not to hand-sort the bin. |
 | **Instant feedback tag** | "Good job! The wet bin is clean." / "Oops! The wet bin is mixed: plastic bag, bottle. Only food scraps, peels and tea leaves go here." |
 | **Worker check (👍 / 👎)** | Confirm the AI grade, or pick the correct one. The worker's grade counts for the score; the AI's grade is kept to measure accuracy. |
 | **Voice notes** | Speak instead of typing (ElevenLabs Scribe speech-to-text, with a browser fallback). |
@@ -124,9 +126,9 @@ on each bin.
 
 | Feature | What it does |
 | --- | --- |
-| **Collection order today** | Bhawans to visit first: open complaints (overflow and missed pickups weigh most, older ones more), then Bhawans with mixed bins to re-sort. |
+| **Collection order today** | Bhawans to visit first: bins with dangerous items come first (worker safety), then open complaints (overflow and missed pickups weigh most, older ones more), then Bhawans with mixed bins to re-sort. |
 | **Notice board** | Open complaints with age and reporter, and a "Mark fixed" button. Average time to fix is tracked. |
-| **Impact numbers** | Bins clean %, compost-ready wet waste (kg), CO₂e avoided (kg), open complaints, AI-worker agreement. |
+| **Impact numbers** | Bins clean %, compost-ready wet waste (kg), open complaints, hazard alerts, CO₂e avoided (kg), AI-worker agreement. |
 | **Compliance report** | Printable monthly report (`/report.html`): stream-wise and Bhawan-wise segregation, complaints and fix times, compost and CO₂e estimates, Bhawans needing attention, and the method and its limits. Print or save as PDF. |
 
 ---
@@ -158,6 +160,46 @@ The four streams follow the SWM Rules 2026:
 | Sanitary | Red | diapers, sanitary pads |
 | Special care | Yellow | medicines, bulbs, batteries, paint |
 
+### Identifying the waste, and the dangerous items
+
+```mermaid
+flowchart LR
+    P[Photo from above<br/>+ optional voice note] --> V[Vision model<br/>Gemini 2.5 Flash]
+    V --> J["JSON: readable, % wrong,<br/>wrong items, confidence"]
+    J --> S[Schema check<br/>one repair if invalid]
+    S --> G[Grade rule<br/>A / B / C]
+    S --> M["Sorting table<br/>item → correct bin"]
+    M --> H{Dangerous item<br/>in the wrong bin?}
+    H -- yes --> A["⚠️ Hazard alert<br/>+ top of collection order"]
+    H -- no --> OK[Normal feedback]
+    G --> W[Worker 👍 / 👎]
+    W --> D[(Labelled photo<br/>for evaluation and future training)]
+```
+
+1. **Vision model.** The photo goes to a vision-language model with the four SWM 2026 streams in the prompt.
+   It names the wrong items it can see and estimates the share of the bin they make up.
+2. **Second signal.** A photo shows only the top layer, so the worker's spoken or typed note ("a battery
+   underneath") is graded too.
+3. **Deterministic mapping.** Each named item is mapped to its correct bin by a fixed sorting table, not by a
+   second model call, so the advice is consistent and cannot be invented.
+4. **Hazards.** The most serious mistake is not plastic in the wet bin. It is a dangerous item where someone will
+   hand-sort it:
+
+| Item | Why it matters |
+| --- | --- |
+| Syringes, needles, blades, broken glass | can cut or prick the person sorting the waste |
+| Batteries | can catch fire when crushed in the collection truck |
+| CFLs, tube lights, mercury thermometers | contain mercury |
+| Medicines | drugs leach into compost and soil |
+| Paint, pesticides, chemicals | toxic |
+| Diapers and pads outside the sanitary bin | infection risk for the sorter; spoil the compost |
+
+   A hazard in its own bin (a battery in the special care bin) is correct and raises no alert.
+5. **Measured, not assumed.** Vision models are only moderately accurate on waste, so every grade can be
+   confirmed or corrected by the worker. The agreement rate is shown live, and each correction becomes a labelled
+   photo. Over a few weeks this gives a campus-specific dataset on which a small on-device detector (for example a
+   YOLO-class model) could be trained and checked against the same evals.
+
 ---
 
 ## Judging criteria
@@ -168,7 +210,7 @@ The four streams follow the SWM Rules 2026:
 | **Affordability** | A phone already in hand and a printed QR sticker per bin, compared with roughly ₹800–3,000 per bin for a fill-level sensor node. Runs on a free Render web service. |
 | **Scalability** | Bhawans and bins are configuration, not code. Grading can move to Render Workflows for retries and parallel fan-out. Any campus, office or housing society with the same four streams can use it. |
 | **Sustainability** | Daily, specific feedback keeps behaviour from slipping back after a campaign ends. Wet waste kept clean can be composted on site, as the 2026 rules expect of bulk generators. |
-| **Innovation** | The collector is the sensor. AI grading is paired with a one-tap human check, so the system measures its own accuracy. A peer leaderboard, voice briefings and a rule-based chat that cannot invent answers. |
+| **Innovation** | The collector is the sensor, and the system protects them: dangerous items in the wrong bin raise a hazard alert before anyone hand-sorts the bin. AI grading is paired with a one-tap human check, so the system measures its own accuracy. A peer leaderboard, voice briefings and a rule-based chat that cannot invent answers. |
 | **Measurable impact** | Every number is on the dashboard and in the monthly report: bins clean %, compost kg, CO₂e kg, complaints and hours to fix, and AI-worker agreement %. |
 
 ---
@@ -481,7 +523,7 @@ pip install -r requirements-dev.txt
 python -m unittest discover -s tests -t . -v
 ```
 
-93 tests, all offline (they use the mock provider and a temporary data folder).
+98 tests, all offline (they use the mock provider and a temporary data folder).
 
 | File | Covers |
 | --- | --- |
@@ -492,6 +534,7 @@ python -m unittest discover -s tests -t . -v
 | `tests/test_api.py` | every endpoint, upload checks, path traversal, agent tools, non-blocking server |
 | `tests/test_hardening.py` | size limits, rate limiting, image checks, EXIF stripping |
 | `tests/test_operations.py` | worker checks, collection order, forecast, CO₂e, compliance report |
+| `tests/test_identify.py` | item → correct bin mapping, hazard flags, hazards in their own bin, hazard priority in the collection order |
 | `tests/test_chat.py` | helper chat: sorting answers, no guessing, complaints in English/Hinglish/Hindi, status, scores |
 | `tests/test_workflows_wiring.py` | hand-off to Render Workflows and reading its result |
 
@@ -588,7 +631,8 @@ app/
   llm_gateway/       providers, retries, fallback, validation, cache, stats
   tracing.py         optional LangSmith tracing
   voice.py           ElevenLabs speech-to-text and text-to-speech
-  chat.py            rule-based helper chat
+  chat.py            rule-based helper chat and the item sorting table
+  identify.py        item → correct bin, hazard flags
   scoring.py         Bhawan scores, campus summary, collection order, forecast
   db.py              SQLite storage and migrations
   matching.py        Bhawan, bin and complaint names from free text (English and Hindi)

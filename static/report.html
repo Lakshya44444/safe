@@ -112,6 +112,7 @@
       [`${s.segregation_rate}%`, "bins correctly segregated (grade A)"],
       [`~${n(s.compost_kg_estimate)} kg`, "wet waste fit for on-site composting (est.)"],
       [`~${n(s.co2e_kg_avoided_estimate)} kg`, "CO₂e avoided vs landfill (est.)"],
+      [`${s.hazards?.bins ?? 0}`, `bins with a dangerous item in the wrong bin${s.hazards?.top_items?.length ? " (" + esc(s.hazards.top_items.join(", ")) + ")" : ""}`],
       [`${s.issues.total} / ${s.issues.open}`, "complaints raised / still open"],
       [s.issues.avg_hours_to_fix != null ? `${s.issues.avg_hours_to_fix} h` : "–", "average time to fix a complaint"],
       [wc.agreement_rate != null ? `${wc.agreement_rate}%` : "–", `AI grades confirmed by workers (${wc.checked || 0} checked)`],

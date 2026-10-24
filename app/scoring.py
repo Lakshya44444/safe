@@ -52,6 +52,7 @@ def bhawan_scores(days: int = 7) -> list[dict]:
             "top_wrong_items": [name for name, _ in items.most_common(3)],
             # Today's average minus the rest of the window; None when either side is empty.
             "trend": round(_avg_points(todays) - _avg_points(earlier)) if todays and earlier else None,
+            "hazard_bins": hazard_stats(rs)["bins"],
         })
     rows.sort(key=lambda x: (-x["score"], -x["reports"], x["bhawan"]))
     for i, row in enumerate(rows, 1):
@@ -90,8 +91,22 @@ def campus_summary(days: int = 7) -> dict:
         "by_stream": by_stream,
         "issues": db.issue_stats(since),
         "worker_checks": db.verdict_stats(since),
+        "hazards": hazard_stats(reports),
         "daily": daily,
     }
+
+
+def hazard_stats(reports: list[dict]) -> dict:
+    """Bins where a dangerous item was found in the wrong bin (sharps, batteries, medicines, sanitary waste)."""
+    from .identify import identify  # local import: identify -> chat -> scoring
+    items: Counter = Counter()
+    bins = 0
+    for r in reports:
+        found = [x["item"] for x in identify(r["found_items"], r["bin_stream"]) if x["hazard"]]
+        if found:
+            bins += 1
+            items.update(found)
+    return {"bins": bins, "top_items": [n for n, _ in items.most_common(3)]}
 
 
 def bhawan_detail(bhawan: str, days: int = 7) -> dict:
@@ -144,7 +159,8 @@ def collection_plan() -> list[dict]:
     stops: dict[str, dict] = {}
 
     def stop(b: str) -> dict:
-        return stops.setdefault(b, {"bhawan": b, "priority": 0.0, "reasons": [], "open_issues": 0, "mixed_bins_today": 0})
+        return stops.setdefault(b, {"bhawan": b, "priority": 0.0, "reasons": [], "open_issues": 0, "mixed_bins_today": 0,
+                                    "hazards_today": 0})
 
     for i in db.list_issues("open", limit=500):
         hours = (now - datetime.fromisoformat(i["created_at"])).total_seconds() / 3600
@@ -152,7 +168,14 @@ def collection_plan() -> list[dict]:
         s["priority"] += ISSUE_WEIGHT.get(i["kind"], 1) * (1 + min(hours, 48) / 12)
         s["open_issues"] += 1
         s["reasons"].append({"kind": i["kind"], "hours_open": round(hours, 1), "issue_id": i["id"]})
+    from .identify import identify
     for r in db.graded_since(window_start(1)):
+        danger = [x["item"] for x in identify(r["found_items"], r["bin_stream"]) if x["hazard"]]
+        if danger:  # worker safety first: pull dangerous items out before anyone hand-sorts the bin
+            s = stop(r["bhawan"])
+            s["priority"] += 4
+            s["hazards_today"] = s.get("hazards_today", 0) + 1
+            s["reasons"].insert(0, {"kind": "hazard", "items": danger, "bin_stream": r["bin_stream"]})
         if r["grade"] == "C":
             s = stop(r["bhawan"])
             s["priority"] += 1

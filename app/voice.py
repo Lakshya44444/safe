@@ -37,6 +37,9 @@ def briefing_text(row: dict | None, bhawan: str, total_bhawans: int) -> str:
     ]
     if row["top_wrong_items"]:
         parts.append("The most common wrong items were " + ", ".join(row["top_wrong_items"]) + ".")
+    if row.get("hazard_bins"):
+        parts.append(f"Warning: {row['hazard_bins']} bins had dangerous items, such as batteries, sharps or "
+                     "medicines, in the wrong bin. Please remind residents to use the special care bin.")
     trend = row.get("trend")
     if trend:
         parts.append(f"That is {abs(trend)} points {'better' if trend > 0 else 'worse'} than earlier this week.")

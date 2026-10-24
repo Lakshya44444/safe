@@ -25,6 +25,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import chat as chat_bot
 from . import config, db, grader, images, pipeline, scoring, voice
+from .identify import identify
 from .llm_gateway import get_gateway
 from .matching import match_bhawan, match_issue_kind, match_stream
 from .ratelimit import WriteGuard
@@ -46,6 +47,9 @@ def public_report(r: dict) -> dict:
     path = r.pop("photo_path", None)
     if path:
         r["photo_url"] = f"/api/photos/{Path(path).name}"
+    if r.get("status") == "graded":
+        r["identified"] = identify(r.get("found_items") or [], r["bin_stream"])
+        r["hazard"] = any(x["hazard"] for x in r["identified"])
     return r
 
 
