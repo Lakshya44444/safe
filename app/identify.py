@@ -60,7 +60,8 @@ def identify(found_items: list[str], bin_stream: str) -> list[dict]:
         key = find_item(name)
         belongs = ITEMS.get(key) if key else None
         why = _hazard(name, bin_stream)
-        out.append({"item": raw, "belongs": belongs, "hazard": why is not None, "why": why})
+        out.append({"item": raw, "belongs": belongs, "right_bin": belongs == bin_stream,
+                    "hazard": why is not None, "why": why})
     return out
 
 

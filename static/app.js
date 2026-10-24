@@ -635,7 +635,7 @@ function showResult(r, was, now) {
   const items = ids.length ? `<p class="id-head">${t("id.title")}</p><ul class="ident">${ids.map((x) => `
       <li class="${x.hazard ? "danger" : ""}"><span>${x.hazard ? "⚠️ " : ""}${esc(hi ? ITEM_HI[x.item] || x.item : x.item)}</span>
         <span class="arrow">→</span>
-        ${x.belongs ? `<span class="to" style="--c:${STREAM_COLOR[x.belongs]}">${BIN_SVG(x.belongs)}${streamName(x.belongs)}</span>` : `<span class="to unsure">${t("id.unsure")}</span>`}</li>`).join("")}</ul>` : "";
+        ${x.right_bin ? `<span class="to ok">✓ ${t("id.right")}</span>` : x.belongs ? `<span class="to" style="--c:${STREAM_COLOR[x.belongs]}">${BIN_SVG(x.belongs)}${streamName(x.belongs)}</span>` : `<span class="to unsure">${t("id.unsure")}</span>`}</li>`).join("")}</ul>` : "";
   const moved = was && now && was !== now;
   const rank = now ? `<p class="rank-move ${moved ? (now < was ? "up" : "down") : ""}">${
     t(moved ? "rank.moved" : "rank.same", { b: r.bhawan, now, was })}</p>` : "";
