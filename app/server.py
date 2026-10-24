@@ -23,6 +23,7 @@ from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from . import chat as chat_bot
 from . import config, db, grader, images, pipeline, scoring, voice
 from .llm_gateway import get_gateway
 from .matching import match_bhawan, match_issue_kind, match_stream
@@ -354,6 +355,17 @@ async def agent_score(request: Request):
     return JSONResponse({"say": f"{bhawan} scores {row['score']} out of 100 this week, rank {row['rank']} of {len(rows)}."})
 
 
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+    lang: str = "en"
+    context: dict | None = None
+
+
+async def chat(request: Request):
+    body: ChatIn = await _body(request, ChatIn)
+    return JSONResponse(await run_in_threadpool(chat_bot.reply, body.message, body.lang, body.context))
+
+
 # ---------- app ----------
 
 async def http_error(request: Request, exc: HTTPException):
@@ -384,6 +396,7 @@ routes = [
     Route("/api/agent/report", agent_report, methods=["POST"]),
     Route("/api/agent/issue", agent_issue, methods=["POST"]),
     Route("/api/agent/score", agent_score, methods=["POST"]),
+    Route("/api/chat", chat, methods=["POST"]),
 ]
 if STATIC_DIR.exists():
     routes.append(Mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static"))

@@ -284,6 +284,8 @@ async function loadIssues() {
       <button class="fix" data-id="${i.id}">${hi ? "ठीक हो गया" : "Mark fixed"}</button>
     </li>`).join("") : `<li class="empty">${hi ? "कोई शिकायत नहीं। सब डब्बे समय पर खाली हुए।" : "Nothing pinned. Every bin was emptied on time."}</li>`;
 }
+$("#report-full").onclick = () => window.openChat?.(LANG === "hi" ? "डब्बा भर गया" : "Bin is full");
+document.addEventListener("issuecreated", () => { if (!$("#view-board").hidden) loadBoard(); });
 $("#issues").addEventListener("click", async (e) => {
   const b = e.target.closest(".fix");
   if (!b) return;

@@ -189,6 +189,7 @@ python -m unittest discover -s tests -t . -v
 | Collection team | "Collection order today": open complaints first (overflow and missed pickup weigh most, older ones more), then Bhawans with mixed bins to re-sort |
 | Warden | "Needs a nudge": a straight-line trend over each Bhawan's last 7 daily scores flags those heading below a B or falling 5+ points a day, with a one-tap voice briefing |
 | Estate office | Printable monthly SWM Rules 2026 compliance report (`/report.html`): stream-wise and Bhawan-wise segregation, complaints and fix times, compost and CO₂e estimates, method and limits |
+| Students | "Report a full bin" button and a small helper chat: log a full bin or missed pickup in plain words (English, Hinglish or Hindi), ask which bin an item goes in, ask a Bhawan's score, check a complaint's status. Rule-based on purpose: answers come from a fixed sorting table and the app's own data, and unknown items get "not sure" instead of a guess |
 | Everyone | Estimated CO₂e avoided by composting clean wet waste instead of landfilling it |
 
 Why these, with sources:
@@ -306,6 +307,7 @@ tests/             unit, API and eval tests
 | POST | `/api/reports/{id}/verdict` | JSON `{"agree": true}` or `{"agree": false, "grade": "B"}` |
 | GET | `/api/collection-plan` | ordered list of Bhawans to visit first, with reasons |
 | GET | `/api/forecast?days=7` | per-Bhawan trend, expected next-day score, `needs_nudge` |
+| POST | `/api/chat` | JSON `{"message": "bin is full at Govind", "lang": "en", "context": null}`; returns `say`, `choices`, next `context` |
 | GET | `/api/compliance?days=30` | everything in the compliance report, with method and sources |
 
 ## Limits
