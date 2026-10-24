@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="hi-Latn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kachra Report Card</title>
+  <meta name="description" content="Har Bhawan ka roz ka kachra segregation report card, IIT Roorkee">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Hind:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg class="brand-bins" viewBox="0 0 64 24" aria-hidden="true">
+        <rect x="0" y="4" width="13" height="20" rx="2" fill="var(--wet)"/>
+        <rect x="17" y="4" width="13" height="20" rx="2" fill="var(--dry)"/>
+        <rect x="34" y="4" width="13" height="20" rx="2" fill="var(--sanitary)"/>
+        <rect x="51" y="4" width="13" height="20" rx="2" fill="var(--special)"/>
+      </svg>
+      <div>
+        <h1>Kachra Report Card</h1>
+        <p class="sub">IIT Roorkee ke Bhawans, roz ka segregation hisaab</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-board" aria-selected="true" aria-controls="view-board">Leaderboard</button>
+      <button role="tab" id="tab-report" aria-selected="false" aria-controls="view-report">Report karo</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Leaderboard -->
+    <section id="view-board" role="tabpanel" aria-labelledby="tab-board">
+      <div class="summary" id="summary" aria-live="polite"></div>
+
+      <div class="board-head">
+        <h2>Is hafte ki ranking</h2>
+        <label class="range">
+          <span>Pichhle</span>
+          <select id="days">
+            <option value="1">1 din</option>
+            <option value="7" selected>7 din</option>
+            <option value="30">30 din</option>
+          </select>
+        </label>
+      </div>
+      <ol class="board" id="board"></ol>
+
+      <div class="trend-wrap">
+        <h2>Campus ka score, din-ba-din</h2>
+        <svg id="trend" class="trend" viewBox="0 0 640 180" role="img" aria-label="Daily campus segregation score"></svg>
+      </div>
+
+      <div class="recent">
+        <h2>Taaza reports</h2>
+        <ul id="recent"></ul>
+      </div>
+    </section>
+
+    <!-- Worker report -->
+    <section id="view-report" role="tabpanel" aria-labelledby="tab-report" hidden>
+      <form id="report-form" class="report">
+        <label class="field">
+          <span>Bhawan</span>
+          <select name="bhawan" id="bhawan" required></select>
+        </label>
+
+        <fieldset class="field">
+          <legend>Kaunsa dabba?</legend>
+          <div class="bins" id="bins"></div>
+        </fieldset>
+
+        <label class="photo-drop" id="photo-drop">
+          <input type="file" name="photo" id="photo" accept="image/*" capture="environment">
+          <img id="photo-preview" alt="" hidden>
+          <span id="photo-hint">Dabbe ki photo lo</span>
+        </label>
+
+        <div class="field">
+          <span class="label">Kuch bolna hai? (optional)</span>
+          <div class="voice-row">
+            <button type="button" class="mic" id="mic" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2Z"/></svg>
+              <span id="mic-label">Bol ke batao</span>
+            </button>
+            <input type="text" name="note" id="note" placeholder="jaise: wet dabbe mein polythene hai">
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Aapka naam (optional)</span>
+          <input type="text" name="reporter" id="reporter" autocomplete="name">
+        </label>
+
+        <button type="submit" class="submit" id="submit">Report bhejo</button>
+        <p class="form-error" id="form-error" role="alert"></p>
+      </form>
+
+      <div class="result" id="result" hidden aria-live="polite"></div>
+
+      <div class="agent" id="agent" hidden>
+        <h2>Ya seedha baat karo</h2>
+        <p>Bina type kiye report karo. Bhawan aur dabba bolo, agent report darj kar dega.</p>
+        <div id="agent-slot"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Grades follow India's Solid Waste Management Rules 2026: geela, sookha, sanitary, special care.
+    A = 10% tak galat cheezein, B = 35% tak, C = usse zyada.
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
