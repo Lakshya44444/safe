@@ -1,0 +1,17 @@
+services:
+  web:
+    build: .
+    image: kachra-report-card
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - kachra-data:/data
+    restart: unless-stopped
+
+volumes:
+  kachra-data:

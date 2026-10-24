@@ -17,3 +17,17 @@ jobs:
         run: python -m unittest discover -s tests -t . -v
       - name: Grader eval report (replay fixtures)
         run: python -m evals.run_evals --no-save
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t kachra .
+      - name: Run and smoke-test
+        run: |
+          docker run -d --name k -p 8000:8000 -e GRADER_PROVIDER=mock kachra
+          for i in $(seq 1 30); do curl -sf localhost:8000/api/health && break; sleep 1; done
+          pip install requests
+          python scripts/smoke_test.py http://localhost:8000 || true
+          curl -sf -X POST "localhost:8000/api/reports?wait=1" -F bhawan=Govind -F bin_stream=wet -F note="bin is clean" | grep '"status":"graded"'

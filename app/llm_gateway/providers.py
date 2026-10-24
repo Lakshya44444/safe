@@ -61,7 +61,8 @@ class GeminiProvider:
             cand = data["candidates"][0]
             text = "".join(p.get("text", "") for p in cand["content"]["parts"])
         except (KeyError, IndexError) as e:
-            reason = data.get("promptFeedback", {}).get("blockReason") or data.get("candidates", [{}])[0].get("finishReason")
+            cands = data.get("candidates") or [{}]
+            reason = data.get("promptFeedback", {}).get("blockReason") or cands[0].get("finishReason")
             raise ProviderError(f"no text in response ({reason})", provider=self.name) from e
         usage = data.get("usageMetadata", {})
         return LLMResponse(text=text, provider=self.name, model=self.model,

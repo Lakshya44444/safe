@@ -78,6 +78,8 @@ class Matching(unittest.TestCase):
         self.assertEqual(match_stream("Special care"), "special_care")
         self.assertEqual(match_stream("e-waste"), "special_care")
         self.assertIsNone(match_stream("purple"))
+        self.assertEqual(match_stream("गीला"), "wet")
+        self.assertEqual(match_bhawan("गोविंद भवन"), "Govind")
 
     def test_issue_kind(self):
         self.assertEqual(match_issue_kind("the bin is full"), "overflow")

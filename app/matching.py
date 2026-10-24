@@ -18,6 +18,16 @@ STREAM_ALIASES = {
     "sanitary": "sanitary",
     "special_care": "special_care", "special": "special_care", "hazardous": "special_care",
     "e_waste": "special_care",
+    # Devanagari, for the voice agent and Hindi keyboards
+    "गीला": "wet", "गीले": "wet", "सूखा": "dry", "सूखे": "dry", "सैनिटरी": "sanitary",
+    "स्पेशल": "special_care", "खतरनाक": "special_care",
+}
+
+BHAWAN_HI = {
+    "आज़ाद": "Azad", "आजाद": "Azad", "कॉटली": "Cautley", "कौटली": "Cautley", "गंगा": "Ganga", "गोविंद": "Govind",
+    "जवाहर": "Jawahar", "मालवीय": "Malviya", "राधाकृष्णन": "Radhakrishnan", "राजेंद्र": "Rajendra",
+    "राजेन्द्र": "Rajendra", "राजीव": "Rajiv", "रवींद्र": "Ravindra", "रविन्द्र": "Ravindra", "हिमालय": "Himalaya",
+    "इंदिरा": "Indira", "कस्तूरबा": "Kasturba", "सरोजिनी": "Sarojini", "विज्ञान": "Vigyan Kunj",
 }
 
 ISSUE_ALIASES = [
@@ -32,7 +42,10 @@ def match_bhawan(name: str | None) -> str | None:
     """'govind', 'Govind Bhawan', 'GOVIND hostel' -> 'Govind'."""
     if not name:
         return None
-    n = " ".join(_BHAWAN_WORDS.sub("", name.lower()).split())
+    n = " ".join(_BHAWAN_WORDS.sub("", name.lower()).replace("भवन", "").split())
+    for hi, en in BHAWAN_HI.items():
+        if n.startswith(hi):
+            return en
     if len(n) < 3:
         return None
     for b in config.BHAWANS:

@@ -61,7 +61,8 @@ GRADE_POINTS = {"A": 100, "B": 60, "C": 20}
 # Assumed weight of one full wet bin; only used for the dashboard's compost estimate.
 KG_PER_WET_BIN = float(os.getenv("KG_PER_WET_BIN", "12"))
 
-MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+# Phones resize photos before upload (static/app.js); this is the hard cap for anything else.
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 # Each report costs an LLM call: cap writes per client IP per minute.
 WRITES_PER_MINUTE = int(os.getenv("WRITES_PER_MINUTE", "30"))
 # Days, "today" and trends are counted in campus time, not UTC.

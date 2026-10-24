@@ -232,6 +232,27 @@ python -m scripts.seed_demo     # a week of demo data
 uvicorn app.server:app --reload # http://127.0.0.1:8000
 ```
 
+## Docker
+
+```bash
+docker compose up --build          # http://localhost:8000, data in the kachra-data volume
+# or
+docker build -t kachra . && docker run -p 8000:8000 --env-file .env kachra
+```
+
+The image runs as a non-root user, keeps the database, photos and audio on `/data`,
+seeds the demo week on first start and has a health check on `/api/health`.
+
+## Checking a deployment
+
+```bash
+python scripts/smoke_test.py https://kachra-report-card.onrender.com --photo bin.jpg
+```
+
+Prints PASS / FAIL / SKIP for: server up, real LLM configured, ElevenLabs TTS/STT, every page
+and API, grading a note and a photo with the live model, the warden's audio, complaints,
+the agent tools and the gateway stats.
+
 ## Layout
 
 ```

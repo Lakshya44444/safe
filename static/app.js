@@ -522,6 +522,8 @@ $("#report-form").onsubmit = async (e) => {
 
   const fd = new FormData($("#report-form"));
   fd.set("bin_stream", pickedStream);
+  const photo = $("#photo").files[0];
+  if (photo) fd.set("photo", await shrinkPhoto(photo), "bin.jpg");
   const submit = $("#submit");
   submit.disabled = true;
   submit.textContent = t("submit.busy");
@@ -550,6 +552,24 @@ $("#report-form").onsubmit = async (e) => {
     submit.textContent = t("submit");
   }
 };
+
+// Phone photos are 3-12 MB. Resize to 1600 px on the phone: faster upload on campus Wi-Fi,
+// and the server would shrink it to that size anyway.
+async function shrinkPhoto(file, maxSide = 1600) {
+  if (file.size < 600 * 1024 || !("createImageBitmap" in window)) return file;
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.85));
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;  // unusual format: let the server handle it
+  }
+}
 
 function showResult(r, was, now) {
   lastResult = [r, was, now];

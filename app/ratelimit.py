@@ -52,7 +52,7 @@ class WriteGuard:
             except ValueError:
                 length = 0
             if length > self.max_body:
-                await JSONResponse({"error": "Request is too large (max 8 MB)."}, 413)(scope, receive, send)
+                await JSONResponse({"error": "Request is too large (max 15 MB)."}, 413)(scope, receive, send)
                 return
             if not self.allow(self.client_ip(scope)):
                 await JSONResponse({"error": "Too many requests. Wait a minute and try again."}, 429,

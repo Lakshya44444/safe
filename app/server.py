@@ -58,7 +58,7 @@ def int_param(request: Request, name: str, default: int, lo: int, hi: int) -> in
 async def read_upload(f: UploadFile) -> bytes:
     data = await f.read(config.MAX_UPLOAD_BYTES + 1)
     if len(data) > config.MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "File must be smaller than 8 MB")
+        raise HTTPException(413, "File must be smaller than 15 MB")
     return data
 
 
