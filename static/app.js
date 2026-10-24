@@ -482,6 +482,21 @@ $("#photo").onchange = () => {
   $("#photo-hint").hidden = true;
 };
 
+// Sample pictures (illustrations) so the app can be tried without a bin nearby.
+$$(".sample").forEach((b) => b.addEventListener("click", async () => {
+  try {
+    const blob = await (await fetch(b.dataset.src)).blob();
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], b.dataset.src.split("/").pop(), { type: "image/jpeg" }));
+    $("#photo").files = dt.files;
+    $("#photo").onchange();
+    pickStream(b.dataset.stream);
+    setError("");
+  } catch (e) {
+    showBanner(e.message);
+  }
+}));
+
 // Voice note -> ElevenLabs Scribe (server) -> text box. Falls back to the browser's recogniser.
 let recorder = null;
 $("#mic").onclick = async () => {

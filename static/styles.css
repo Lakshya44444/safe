@@ -440,3 +440,10 @@ a { color: inherit; }
 .verdict-row button:disabled { opacity: .5; }
 .verdict-done { margin: 0; color: var(--pass); font-weight: 600; }
 @media (max-width: 860px) { .duo-even { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- sample pictures ---- */
+.samples { margin-top: .7rem; font-size: .88rem; color: var(--ink-soft); }
+.sample-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-top: .4rem; }
+.sample { display: grid; gap: .25rem; justify-items: center; border: 1.5px solid var(--line); background: var(--paper-2); color: var(--ink); border-radius: 12px; padding: .4rem; font-size: .8rem; font-weight: 600; cursor: pointer; min-width: 0; }
+.sample img { width: 100%; max-width: 88px; aspect-ratio: 1; object-fit: cover; border-radius: 50%; }
+.sample:hover, .sample:focus-visible { border-color: var(--ink); }
