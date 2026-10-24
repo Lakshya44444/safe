@@ -39,6 +39,9 @@ STREAM_LABELS_HI = {
     "special_care": "special care kachra (dawai, bulb, battery, paint)",
 }
 
+# Assumed weight of one full wet bin, used only for the compost estimate shown on the dashboard.
+KG_PER_WET_BIN = float(os.getenv("KG_PER_WET_BIN", "12"))
+
 # Grade -> points used for the Bhawan score.
 GRADE_POINTS = {"A": 100, "B": 60, "C": 20}
 

@@ -39,7 +39,23 @@ def main(days: int = 7, per_day: int = 6, seed: int = 7) -> None:
                 g = grader.grade_bin(None, stream, note)
                 db.save_grade(rid, g.grade, g.contamination, g.found_items, g.tag_hi)
                 n += 1
-    print(f"seeded {n} demo reports")
+    # A few collection issues, most already fixed, so the issue panel and fix-time stat have data.
+    issue_notes = {"overflow": "dabba bhar gaya hai", "missed_pickup": "subah gaadi nahi aayi",
+                   "broken_bin": "dabbe ka dhakkan toota hai"}
+    k = 0
+    for d in range(days - 1, -1, -1):
+        for _ in range(rnd.randint(1, 3)):
+            kind = rnd.choice(list(issue_notes))
+            t = now - timedelta(days=d, hours=rnd.randint(1, 10))
+            iid = db.create_issue(rnd.choice(config.BHAWANS), kind, issue_notes[kind], "demo-seed",
+                                  created_at=t.isoformat(timespec="seconds"))
+            if d > 0 or rnd.random() < 0.3:
+                fixed_at = min(now, t + timedelta(hours=rnd.uniform(1, 9)))
+                with db.connect() as conn:
+                    conn.execute("UPDATE issues SET status='resolved', resolved_at=? WHERE id=?",
+                                 (fixed_at.isoformat(timespec="seconds"), iid))
+            k += 1
+    print(f"seeded {n} demo reports and {k} issues")
 
 
 if __name__ == "__main__":

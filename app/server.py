@@ -179,6 +179,45 @@ async def transcribe(request: Request):
     return JSONResponse({"text": text})
 
 
+# ---- Collection issues: overflowing bin, missed pickup ----
+
+ISSUE_ALIASES = {"full": "overflow", "bhar": "overflow", "overflow": "overflow",
+                 "missed": "missed_pickup", "nahi aayi": "missed_pickup", "gaadi": "missed_pickup",
+                 "toota": "broken_bin", "broken": "broken_bin"}
+
+
+def match_issue_kind(k: str | None) -> str:
+    k = (k or "").lower().strip()
+    if k in db.ISSUE_KINDS:
+        return k
+    for word, kind in ISSUE_ALIASES.items():
+        if word in k:
+            return kind
+    return "other"
+
+
+async def create_issue(request: Request):
+    body = await (request.json() if request.headers.get("content-type", "").startswith("application/json")
+                  else request.form())
+    bhawan = match_bhawan(body.get("bhawan"))
+    if not bhawan:
+        return err("Bhawan ka naam samajh nahi aaya")
+    iid = db.create_issue(bhawan, match_issue_kind(body.get("kind")),
+                          (body.get("note") or "").strip()[:500] or None,
+                          (body.get("reporter") or "").strip()[:80] or None)
+    return JSONResponse({"id": iid, "bhawan": bhawan}, status_code=201)
+
+
+async def list_issues(request: Request):
+    status = request.query_params.get("status", "open")
+    return JSONResponse(db.list_issues(None if status == "all" else status))
+
+
+async def resolve_issue(request: Request):
+    r = db.resolve_issue(int(request.path_params["id"]))
+    return JSONResponse(r) if r else err("not found", 404)
+
+
 # ---- ElevenLabs Agent server tools (webhooks the voice agent calls) ----
 
 async def agent_report(request: Request):
@@ -209,6 +248,20 @@ async def agent_score(request: Request):
     return JSONResponse({"say": f"{bhawan} ka score {row['score']} hai, rank {row['rank']} out of {len(rows)}."})
 
 
+async def agent_issue(request: Request):
+    """Tool: report_issue(bhawan, kind, note). 'Govind ka dabba bhar gaya hai.'"""
+    body = await request.json()
+    bhawan = match_bhawan(body.get("bhawan"))
+    if not bhawan:
+        return JSONResponse({"ok": False, "say": "Kaunsa Bhawan? Naam dobara boliye."})
+    kind = match_issue_kind(body.get("kind") or body.get("note"))
+    iid = db.create_issue(bhawan, kind, (body.get("note") or "")[:500] or None, body.get("reporter"))
+    what = {"overflow": "dabba bhar jaane ki", "missed_pickup": "gaadi na aane ki",
+            "broken_bin": "toote dabbe ki"}.get(kind, "")
+    return JSONResponse({"ok": True, "issue_id": iid,
+                         "say": f"{bhawan} ki {what} shikayat darj ho gayi. Number {iid}.".replace("  ", " ")})
+
+
 routes = [
     Route("/api/health", health),
     Route("/api/meta", meta),
@@ -223,6 +276,10 @@ routes = [
     Route("/api/transcribe", transcribe, methods=["POST"]),
     Route("/api/agent/report", agent_report, methods=["POST"]),
     Route("/api/agent/score", agent_score, methods=["POST"]),
+    Route("/api/agent/issue", agent_issue, methods=["POST"]),
+    Route("/api/issues", create_issue, methods=["POST"]),
+    Route("/api/issues", list_issues),
+    Route("/api/issues/{id:int}/resolve", resolve_issue, methods=["POST"]),
 ]
 if STATIC_DIR.exists():
     routes.append(Mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static"))

@@ -25,7 +25,22 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 CREATE INDEX IF NOT EXISTS idx_reports_bhawan ON reports(bhawan);
 CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_at);
+
+-- Collection problems: bin overflowing, pickup missed, bin broken.
+CREATE TABLE IF NOT EXISTS issues (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT NOT NULL,
+    bhawan       TEXT NOT NULL,
+    kind         TEXT NOT NULL,           -- overflow | missed_pickup | broken_bin | other
+    note         TEXT,
+    reporter     TEXT,
+    status       TEXT NOT NULL DEFAULT 'open',   -- open | resolved
+    resolved_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
 """
+
+ISSUE_KINDS = ["overflow", "missed_pickup", "broken_bin", "other"]
 
 
 def now_iso() -> str:
@@ -107,3 +122,51 @@ def graded_since(since_iso: str) -> list[dict]:
             (since_iso,),
         ).fetchall()
         return [_row(r) for r in rows]
+
+
+# ---- issues ----
+
+def create_issue(bhawan: str, kind: str, note: str | None, reporter: str | None,
+                 created_at: str | None = None) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO issues (created_at, bhawan, kind, note, reporter) VALUES (?, ?, ?, ?, ?)",
+            (created_at or now_iso(), bhawan, kind, note, reporter),
+        )
+        return int(cur.lastrowid)
+
+
+def list_issues(status: str | None = "open", limit: int = 50) -> list[dict]:
+    q, args = "SELECT * FROM issues", []
+    if status:
+        q += " WHERE status=?"
+        args.append(status)
+    q += " ORDER BY created_at DESC, id DESC LIMIT ?"
+    args.append(limit)
+    with connect() as conn:
+        return [dict(r) for r in conn.execute(q, args).fetchall()]
+
+
+def resolve_issue(issue_id: int) -> dict | None:
+    with connect() as conn:
+        conn.execute("UPDATE issues SET status='resolved', resolved_at=? WHERE id=? AND status='open'",
+                     (now_iso(), issue_id))
+        r = conn.execute("SELECT * FROM issues WHERE id=?", (issue_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def issue_stats(since_iso: str) -> dict:
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM issues WHERE created_at>=?", (since_iso,)).fetchall()
+    rows = [dict(r) for r in rows]
+    fixed = [r for r in rows if r["status"] == "resolved" and r["resolved_at"]]
+    hours = []
+    for r in fixed:
+        a = datetime.fromisoformat(r["created_at"])
+        b = datetime.fromisoformat(r["resolved_at"])
+        hours.append((b - a).total_seconds() / 3600)
+    return {
+        "total": len(rows),
+        "open": sum(1 for r in rows if r["status"] == "open"),
+        "avg_hours_to_fix": round(sum(hours) / len(hours), 1) if hours else None,
+    }

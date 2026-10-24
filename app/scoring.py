@@ -59,10 +59,20 @@ def campus_summary(days: int = 7) -> dict:
         by_day[r["created_at"][:10]].append(config.GRADE_POINTS[r["grade"]])
     daily = [{"date": d, "score": round(sum(v) / len(v)), "reports": len(v)}
              for d, v in sorted(by_day.items())]
+    by_stream = {}
+    for s in config.STREAMS:
+        rs = [r for r in reports if r["bin_stream"] == s]
+        by_stream[s] = {"reports": len(rs),
+                        "clean_rate": round(100 * sum(1 for r in rs if r["grade"] == "A") / len(rs)) if rs else None}
     return {
         "days": days,
         "reports": n,
         "segregation_rate": round(100 * clean / n) if n else 0,
         "wet_bins_compost_ready": wet_clean,
+        # Estimate only: clean wet bins x assumed fill weight (KG_PER_WET_BIN, default 12 kg).
+        "compost_kg_estimate": round(wet_clean * config.KG_PER_WET_BIN),
+        "kg_per_wet_bin": config.KG_PER_WET_BIN,
+        "by_stream": by_stream,
+        "issues": db.issue_stats(_since(days)),
         "daily": daily,
     }

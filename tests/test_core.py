@@ -58,5 +58,17 @@ class Scores(unittest.TestCase):
         self.assertEqual(rows[-1]["score"], 20)
 
 
+class Issues(unittest.TestCase):
+    def test_issue_flow(self):
+        from app.server import match_issue_kind
+        db.init_db()
+        self.assertEqual(match_issue_kind("dabba bhar gaya"), "overflow")
+        self.assertEqual(match_issue_kind("gaadi nahi aayi"), "missed_pickup")
+        iid = db.create_issue("Govind", "overflow", "full", None)
+        self.assertTrue(any(i["id"] == iid for i in db.list_issues("open")))
+        self.assertEqual(db.resolve_issue(iid)["status"], "resolved")
+        self.assertFalse(any(i["id"] == iid for i in db.list_issues("open")))
+
+
 if __name__ == "__main__":
     unittest.main()
