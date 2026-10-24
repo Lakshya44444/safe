@@ -200,6 +200,42 @@ flowchart LR
    photo. Over a few weeks this gives a campus-specific dataset on which a small on-device detector (for example a
    YOLO-class model) could be trained and checked against the same evals.
 
+### Model design, from the research
+
+Which model should identify the waste? The literature gives a clear answer: **off-the-shelf models are not
+enough on cluttered waste, fine-tuning on waste images is what works, and unlabelled photos can be labelled cheaply.**
+
+| Finding | Source | What we take from it |
+| --- | --- | --- |
+| Zero-shot open-vocabulary detectors do poorly on cluttered waste: OWLv2 7.3 mAP and Grounding DINO 7.0 mAP with class-name prompts, 13.5 and 12.4 with LLM-optimised prompts | Abid, Muhammad & Khan, *Robust and Label-efficient Deep Waste Detection*, BMVC 2025 ([arXiv 2508.18799](https://arxiv.org/abs/2508.18799)) | Do not rely on a general detector out of the box |
+| Fine-tuned detectors on ZeroWaste reach 34.0 mAP (YOLO11-L) to 51.6 mAP (Grounding DINO Swin-B, Co-DETR, DETA), against a 24.2 original baseline | same | Fine-tune on waste images |
+| Ensemble pseudo-labels on 6,065 unlabelled images add +2.7 to +3.7 mAP; YOLO11 trained on pseudo-labels alone gains +6.3 (to 40.3) | same | Label campus photos cheaply with a teacher ensemble plus worker checks |
+| VLMs match items to bins with 47–73% accuracy; with location-specific guidelines in the prompt, GPT-4o goes from 0.89 to 0.94 on item recyclability (the authors note the gain may come mostly from the more detailed prompt) | Park, Kumar & Rajpurkar 2026 ([arXiv 2601.00905](https://arxiv.org/abs/2601.00905)) | Put the local rules (SWM 2026 four streams) in the prompt, and keep a human check |
+| ZeroWaste: first in-the-wild industrial waste detection and segmentation dataset; objects are deformable, often translucent, in cluttered scenes | Bashkirova et al., CVPR 2022 ([paper](https://openaccess.thecvf.com/content/CVPR2022/html/Bashkirova_ZeroWaste_Dataset_Towards_Deformable_Object_Segmentation_in_Cluttered_Scenes_CVPR_2022_paper.html), [site](https://ai.bu.edu/zerowaste)) | Training data for cluttered bins |
+| TACO: 1,500 images, 4,784 annotations of litter in the wild, crowdsourced and growing | Proença & Simões 2020 ([arXiv 2003.06975](https://arxiv.org/abs/2003.06975)) | Training data for everyday items photographed by phones |
+| TrashNet, re-annotated and segmented in YOLO format | [Mendeley Data](https://data.mendeley.com/datasets/f6y37w8hxb/1) | Ready-to-train item classes |
+| Industry already runs camera-based waste recognition at sorting plants: Greyparrot reports 115 material categories and claims 95%+ accuracy (vendor figure) | [Greyparrot](https://www.greyparrot.ai/product) | The technology works at the plant; we move it to the source, where segregation actually happens |
+
+**Planned model: a two-stage, human-checked pipeline**
+
+```mermaid
+flowchart LR
+    P[Bin photo] --> Y["Stage 1: on-phone detector<br/>YOLO11-n, fine-tuned on TACO + ZeroWaste<br/>+ TrashNet + campus photos"]
+    Y -->|boxes, item classes, confidence| R{confident?}
+    R -- yes --> M[Sorting table<br/>item → SWM stream, hazard]
+    R -- no / unknown item --> V["Stage 2: vision-language model<br/>Gemini, prompt with SWM 2026 rules"]
+    V --> M
+    M --> G[Grade + hazard alert]
+    G --> W[Worker 👍 / 👎]
+    W --> L[(Campus labelled set)]
+    L -->|teacher-ensemble pseudo-labels<br/>+ worker labels| Y
+```
+
+- **Stage 1** gives per-item boxes, works offline and costs nothing per photo.
+- **Stage 2** handles low-confidence and unusual items, using the local rules, as today.
+- **The loop** turns every worker check into a label. Ensemble pseudo-labelling covers the unlabelled photos, following the BMVC 2025 method.
+- **Today the app runs Stage 2 only**, and collects the labels Stage 1 needs. The same evals and thresholds would gate any new model before it replaces the current one.
+
 ---
 
 ## Judging criteria
@@ -675,6 +711,7 @@ Dockerfile, docker-compose.yml, render.yaml, render-full.yaml
 
 - Pilot in two Bhawans for two weeks, with weighed bins to calibrate the compost estimate.
 - Use worker corrections as a labelled dataset to measure and improve the grader.
+- Train the Stage 1 on-phone detector (YOLO11-n) on TACO, ZeroWaste, TrashNet and campus photos, and gate it with the same evals.
 - Postgres storage and warden / estate-office logins.
 - Weekly WhatsApp or email digest to wardens.
 - Extend to mess kitchens, academic buildings and staff housing.
@@ -689,6 +726,11 @@ Dockerfile, docker-compose.yml, render.yaml, render-full.yaml
 - [Encouraging urban households to segregate waste (Wadehra & Mishra 2018, EfD)](https://www.efdinitiative.org/publications/encouraging-urban-households-segregate-waste-they-generate-insights-field-experiment)
 - [Vision-language models for waste classification (arXiv 2601.00905)](https://arxiv.org/abs/2601.00905)
 - [US EPA Waste Reduction Model (WARM)](https://www.epa.gov/warm)
+- [Robust and Label-efficient Deep Waste Detection (BMVC 2025, arXiv 2508.18799)](https://arxiv.org/abs/2508.18799)
+- [ZeroWaste dataset (CVPR 2022)](https://openaccess.thecvf.com/content/CVPR2022/html/Bashkirova_ZeroWaste_Dataset_Towards_Deformable_Object_Segmentation_in_Cluttered_Scenes_CVPR_2022_paper.html)
+- [TACO: Trash Annotations in Context (arXiv 2003.06975)](https://arxiv.org/abs/2003.06975)
+- [TrashNet in YOLO format (Mendeley Data)](https://data.mendeley.com/datasets/f6y37w8hxb/1)
+- [Greyparrot Analyzer](https://www.greyparrot.ai/product)
 
 ---
 
