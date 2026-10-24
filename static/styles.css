@@ -451,9 +451,19 @@ a { color: inherit; }
 /* ---- helper chat ---- */
 .notes-tools { display: inline-flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
 .report-full { border: 0; background: var(--pen); color: #fff; border-radius: 999px; padding: .45rem 1rem; font-weight: 700; min-height: 40px; cursor: pointer; }
-.chat-fab { position: fixed; right: 16px; bottom: 16px; z-index: 40; display: inline-flex; align-items: center; gap: .5rem; border: 0; background: var(--ink); color: var(--paper-2); border-radius: 999px; padding: .75rem 1.1rem; font-weight: 700; box-shadow: 0 10px 28px -10px rgba(0,0,0,.5); cursor: pointer; }
+.chat-fab { position: fixed; right: 14px; bottom: 14px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; border: 0; background: none; padding: 0; cursor: pointer; }
 .chat-fab[hidden] { display: none !important; }
-.chat-fab svg { width: 20px; height: 20px; fill: currentColor; }
+.chat-fab .mascot { width: 92px; height: 100px; filter: drop-shadow(0 8px 14px rgba(0,0,0,.28)); transform-origin: 50% 100%; }
+.fab-bubble { position: relative; background: var(--ink); color: var(--paper-2); font-weight: 700; font-size: .95rem; padding: .45rem .85rem; border-radius: 14px; white-space: nowrap; box-shadow: 0 8px 20px -10px rgba(0,0,0,.5); margin-right: 6px; }
+.fab-bubble::after { content: ""; position: absolute; right: 34px; bottom: -7px; border: 7px solid transparent; border-top-color: var(--ink); border-bottom: 0; }
+.chat-fab:hover .mascot, .chat-fab:focus-visible .mascot { transform: scale(1.06); }
+@media (prefers-reduced-motion: no-preference) {
+  .chat-fab .mascot { animation: kachru-bob 2.6s ease-in-out infinite; }
+  .chat-fab .wave { transform-origin: 66px 44px; animation: kachru-wave 1.3s ease-in-out infinite; }
+}
+@keyframes kachru-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes kachru-wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-22deg); } }
+@media (max-width: 620px) { .chat-fab .mascot { width: 74px; height: 80px; } .fab-bubble { font-size: .85rem; } }
 .chat-panel { position: fixed; right: 16px; bottom: 16px; z-index: 41; width: min(380px, calc(100vw - 32px)); height: min(560px, calc(100vh - 32px)); display: flex; flex-direction: column; background: var(--paper-2); color: var(--ink); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 24px 60px -20px rgba(0,0,0,.45); overflow: hidden; }
 .chat-panel[hidden] { display: none !important; }
 .chat-panel header { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem; background: var(--ink); color: var(--paper-2); font-family: var(--display); font-size: 1.1rem; }
@@ -467,4 +477,4 @@ a { color: inherit; }
 .chat-form { display: flex; gap: .4rem; padding: .6rem; border-top: 1px solid var(--line); }
 .chat-form input { flex: 1; min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 .75rem; background: var(--paper); color: var(--ink); font: inherit; }
 .chat-form button { border: 0; background: var(--ink); color: var(--paper-2); border-radius: 12px; padding: 0 1rem; font-weight: 700; cursor: pointer; }
-.foot { padding-bottom: 5rem; }
+.foot { padding-bottom: 9rem; }

@@ -6,11 +6,11 @@
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const L = () => (typeof LANG !== "undefined" && LANG === "hi" ? "hi" : "en");
   const S = {
-    en: { open: "Ask or complain", title: "Kachra helper", ph: "Type here… e.g. bin is full at Govind", send: "Send",
-          hello: "Hi! Is a bin full or was pickup missed? Tell me the Bhawan and I'll put it on the notice board. You can also ask which bin something goes in.",
+    en: { open: "Ask or complain", title: "Kachru · Kachra helper", ph: "Type here… e.g. bin is full at Govind", send: "Send",
+          hello: "Hi, I'm Kachru! Is a bin full or was pickup missed? Tell me the Bhawan and I'll put it on the notice board. You can also ask which bin something goes in.",
           chips: ["Bin is full", "Pickup missed", "Where does a battery go?", "Top Bhawan this week"], err: "Could not reach the server. Try again." },
-    hi: { open: "पूछें या शिकायत करें", title: "कचरा सहायक", ph: "यहाँ लिखें… जैसे गोविंद में डब्बा भर गया", send: "भेजें",
-          hello: "नमस्ते! डब्बा भर गया या कूड़ा नहीं उठा? भवन का नाम बताइए, मैं नोटिस बोर्ड पर लगा दूँगा। आप यह भी पूछ सकते हैं कि कौन सी चीज़ किस डब्बे में जाती है।",
+    hi: { open: "पूछें या शिकायत करें", title: "कचरू · कचरा सहायक", ph: "यहाँ लिखें… जैसे गोविंद में डब्बा भर गया", send: "भेजें",
+          hello: "नमस्ते, मैं कचरू हूँ! डब्बा भर गया या कूड़ा नहीं उठा? भवन का नाम बताइए, मैं नोटिस बोर्ड पर लगा दूँगा। आप यह भी पूछ सकते हैं कि कौन सी चीज़ किस डब्बे में जाती है।",
           chips: ["डब्बा भर गया", "कूड़ा नहीं उठा", "बैटरी कहाँ डालें?", "इस हफ़्ते सबसे अच्छा भवन"], err: "सर्वर से जुड़ नहीं पाए। फिर कोशिश करें।" },
   };
   let ctx = null;
@@ -18,7 +18,21 @@
 
   const fab = el("button", "chat-fab");
   fab.type = "button";
-  fab.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg><span></span>';
+  // "Kachru", a friendly bin mascot (original drawing): big enough to spot and tap.
+  fab.innerHTML = `<span class="fab-bubble"></span>
+    <svg class="mascot" viewBox="0 0 80 88" aria-hidden="true">
+      <ellipse cx="40" cy="84" rx="24" ry="4" fill="rgba(0,0,0,.18)"/>
+      <path d="M14 26h52l-5 52a6 6 0 0 1-6 5H25a6 6 0 0 1-6-5Z" fill="#2e8b57"/>
+      <path d="M22 34h4l2 40h-4ZM54 34h4l-2 40h-4Z" fill="rgba(255,255,255,.18)"/>
+      <rect x="8" y="16" width="64" height="12" rx="6" fill="#1f6f43"/>
+      <rect x="31" y="8" width="18" height="10" rx="5" fill="#1f6f43"/>
+      <circle cx="30" cy="48" r="7" fill="#fff"/><circle cx="50" cy="48" r="7" fill="#fff"/>
+      <circle class="eye" cx="31.5" cy="49" r="3.4" fill="#1d2a4b"/><circle class="eye" cx="51.5" cy="49" r="3.4" fill="#1d2a4b"/>
+      <circle cx="22" cy="58" r="3.5" fill="#ff9aa2" opacity=".8"/><circle cx="58" cy="58" r="3.5" fill="#ff9aa2" opacity=".8"/>
+      <path d="M32 60q8 8 16 0" stroke="#1d2a4b" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M66 44q10-6 8-16" stroke="#2e8b57" stroke-width="5" fill="none" stroke-linecap="round" class="wave"/>
+    </svg>`;
+  fab.setAttribute("aria-label", "Chat");
   const panel = el("section", "chat-panel");
   panel.hidden = true;
   panel.setAttribute("role", "dialog");
@@ -33,7 +47,7 @@
 
   function label() {
     const s = S[L()];
-    fab.querySelector("span").textContent = s.open;
+    fab.querySelector(".fab-bubble").textContent = s.open;
     panel.querySelector("header b").textContent = s.title;
     panel.querySelector(".chat-form button").textContent = s.send;
     input.placeholder = s.ph;
