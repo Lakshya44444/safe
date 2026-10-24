@@ -1,0 +1,3 @@
+render>=1.4
+requests>=2.31
+pydantic>=2.6
