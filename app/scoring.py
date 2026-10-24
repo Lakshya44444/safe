@@ -85,8 +85,11 @@ def campus_summary(days: int = 7) -> dict:
         # Estimate only: clean wet bins x assumed weight per bin (KG_PER_WET_BIN).
         "compost_kg_estimate": round(wet_clean * config.KG_PER_WET_BIN),
         "kg_per_wet_bin": config.KG_PER_WET_BIN,
+        # Estimate only: compost estimate x EPA WARM landfill-vs-compost factor (see config).
+        "co2e_kg_avoided_estimate": round(wet_clean * config.KG_PER_WET_BIN * config.CO2E_KG_PER_KG_COMPOSTED),
         "by_stream": by_stream,
         "issues": db.issue_stats(since),
+        "worker_checks": db.verdict_stats(since),
         "daily": daily,
     }
 
@@ -123,3 +126,76 @@ def bhawan_detail(bhawan: str, days: int = 7) -> dict:
         "worst_stream": worst,
         "daily": [{"date": d, "score": round(_avg_points(rs)), "reports": len(rs)} for d, rs in sorted(by_day.items())],
     }
+
+
+# ---------- collection priority (problem area 2) ----------
+
+ISSUE_WEIGHT = {"overflow": 3, "missed_pickup": 3, "broken_bin": 1, "other": 1}
+
+
+def collection_plan() -> list[dict]:
+    """Which Bhawans the collection team should visit first today, and why.
+
+    Priority = open complaints (overflowing / missed pickup weigh most, older ones more)
+             + mixed (C) bins found today, which need re-sorting before collection.
+    No GPS here: it is an ordered list, not a route.
+    """
+    now = datetime.now(timezone.utc)
+    stops: dict[str, dict] = {}
+
+    def stop(b: str) -> dict:
+        return stops.setdefault(b, {"bhawan": b, "priority": 0.0, "reasons": [], "open_issues": 0, "mixed_bins_today": 0})
+
+    for i in db.list_issues("open", limit=500):
+        hours = (now - datetime.fromisoformat(i["created_at"])).total_seconds() / 3600
+        s = stop(i["bhawan"])
+        s["priority"] += ISSUE_WEIGHT.get(i["kind"], 1) * (1 + min(hours, 48) / 12)
+        s["open_issues"] += 1
+        s["reasons"].append({"kind": i["kind"], "hours_open": round(hours, 1), "issue_id": i["id"]})
+    for r in db.graded_since(window_start(1)):
+        if r["grade"] == "C":
+            s = stop(r["bhawan"])
+            s["priority"] += 1
+            s["mixed_bins_today"] += 1
+    plan = sorted(stops.values(), key=lambda x: -x["priority"])
+    for n, s in enumerate(plan, 1):
+        s["order"] = n
+        s["priority"] = round(s["priority"], 1)
+    return plan
+
+
+# ---------- forecast: who needs a nudge (problem area 4) ----------
+
+def _slope(ys: list[float]) -> float:
+    n = len(ys)
+    mx, my = (n - 1) / 2, sum(ys) / n
+    den = sum((x - mx) ** 2 for x in range(n))
+    return sum((x - mx) * (y - my) for x, y in enumerate(ys)) / den if den else 0.0
+
+
+def forecast(days: int = 7, min_days: int = 3) -> list[dict]:
+    """Tomorrow's score per Bhawan from a straight-line fit over its recent daily scores.
+
+    Deliberately simple and explainable: with a week of data per Bhawan, a trend line is
+    about as much as the data supports. Flags Bhawans heading below a B (60) or falling fast.
+    """
+    by: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    for r in db.graded_since(window_start(days)):
+        by[r["bhawan"]][local_day(r["created_at"])].append(r)
+    out = []
+    for bhawan, days_map in by.items():
+        if len(days_map) < min_days:
+            continue
+        series = [_avg_points(rs) for _, rs in sorted(days_map.items())]
+        slope = _slope(series)
+        nxt = max(0.0, min(100.0, series[-1] + slope))
+        out.append({
+            "bhawan": bhawan,
+            "last": round(series[-1]),
+            "slope_per_day": round(slope, 1),
+            "tomorrow": round(nxt),
+            "days_used": len(series),
+            "needs_nudge": nxt < 60 or slope <= -5,
+        })
+    out.sort(key=lambda x: (not x["needs_nudge"], x["tomorrow"]))
+    return out

@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS reports (
     source        TEXT,                   -- photo | note
     provider      TEXT,                   -- which LLM graded it
     model         TEXT,
-    error         TEXT
+    error         TEXT,
+    ai_grade      TEXT,                   -- the model's grade, kept when a worker corrects it
+    verdict       TEXT,                   -- worker check: agree | disagree
+    verdict_at    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_reports_bhawan ON reports(bhawan);
 CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_at);
@@ -69,10 +72,19 @@ def connect() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+# Columns added after the first release; added in place to an existing database.
+_MIGRATIONS = {"reports": {"ai_grade": "TEXT", "verdict": "TEXT", "verdict_at": "TEXT"}}
+
+
 def init_db() -> None:
     with connect() as conn:
         conn.execute("PRAGMA journal_mode=WAL")  # readers don't block the grading thread's writes
         conn.executescript(SCHEMA)
+        for table, cols in _MIGRATIONS.items():
+            have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+            for col, typ in cols.items():
+                if col not in have:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
 
 
 def _report(row: sqlite3.Row) -> dict:
@@ -102,6 +114,34 @@ def save_grade(report_id: int, g: GradeResult) -> None:
             (g.grade, g.contamination, json.dumps(g.found_items), g.tag, g.confidence,
              g.source, g.provider, g.model, report_id),
         )
+
+
+def set_verdict(report_id: int, agree: bool, final_grade: str, tag: str) -> dict | None:
+    """Record the worker's check. The model's original grade is kept in ai_grade; the worker's
+    grade becomes the one that counts for the Bhawan's score."""
+    with connect() as conn:
+        row = conn.execute("SELECT grade, ai_grade FROM reports WHERE id=? AND status='graded'", (report_id,)).fetchone()
+        if not row:
+            return None
+        conn.execute(
+            "UPDATE reports SET verdict=?, verdict_at=?, ai_grade=?, grade=?, tag=? WHERE id=?",
+            ("agree" if agree else "disagree", now_iso(), row["ai_grade"] or row["grade"], final_grade, tag, report_id),
+        )
+    return get_report(report_id)
+
+
+def verdict_stats(since_iso: str) -> dict:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT verdict, ai_grade, grade FROM reports WHERE verdict IS NOT NULL AND created_at>=?", (since_iso,)
+        ).fetchall()
+    n = len(rows)
+    agree = sum(r["verdict"] == "agree" for r in rows)
+    # Which way the model was wrong: too lenient (said cleaner than the worker) is the costly error.
+    order = {"A": 0, "B": 1, "C": 2}
+    lenient = sum(1 for r in rows if r["verdict"] == "disagree" and order.get(r["ai_grade"], 0) < order.get(r["grade"], 0))
+    return {"checked": n, "agree": agree, "agreement_rate": round(100 * agree / n) if n else None,
+            "ai_too_lenient": lenient, "ai_too_strict": n - agree - lenient}
 
 
 def mark_failed(report_id: int, error: str) -> None:

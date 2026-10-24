@@ -61,6 +61,11 @@ GRADE_POINTS = {"A": 100, "B": 60, "C": 20}
 # Assumed weight of one full wet bin; only used for the dashboard's compost estimate.
 KG_PER_WET_BIN = float(os.getenv("KG_PER_WET_BIN", "12"))
 
+# Greenhouse gas avoided per kg of food waste composted instead of landfilled.
+# EPA WARM v12 (Feb 2012), food scraps: landfill +0.69, composting -0.20 MTCO2E per short ton
+# (907.185 kg) -> 0.89 t / 907.185 kg = 0.98 kg CO2e per kg. US landfill assumptions; an estimate.
+CO2E_KG_PER_KG_COMPOSTED = float(os.getenv("CO2E_KG_PER_KG_COMPOSTED", "0.98"))
+
 # Phones resize photos before upload (static/app.js); this is the hard cap for anything else.
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 # Each report costs an LLM call: cap writes per client IP per minute.

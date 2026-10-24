@@ -23,7 +23,7 @@ from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import config, db, images, pipeline, scoring, voice
+from . import config, db, grader, images, pipeline, scoring, voice
 from .llm_gateway import get_gateway
 from .matching import match_bhawan, match_issue_kind, match_stream
 from .ratelimit import WriteGuard
@@ -157,6 +157,56 @@ async def leaderboard(request: Request):
 
 async def summary(request: Request):
     return JSONResponse(scoring.campus_summary(int_param(request, "days", 7, 1, 90)))
+
+
+class VerdictIn(BaseModel):
+    agree: bool
+    grade: str | None = Field(default=None, pattern="^[ABC]$")
+
+
+async def report_verdict(request: Request):
+    """The worker confirms or corrects the AI's grade. Their grade is the one that counts."""
+    body: VerdictIn = await _body(request, VerdictIn)
+    r = db.get_report(request.path_params["id"])
+    if not r or r["status"] != "graded":
+        return fail("Only graded reports can be checked", 404)
+    ai_grade = r.get("ai_grade") or r["grade"]
+    if body.agree:
+        final = ai_grade
+    elif body.grade:
+        final = body.grade
+    else:
+        return fail("Say which grade is right: A, B or C")
+    tag = grader.make_tag(final, r["bin_stream"], r["found_items"])
+    return JSONResponse(public_report(db.set_verdict(r["id"], body.agree, final, tag)))
+
+
+async def collection_plan(request: Request):
+    return JSONResponse(scoring.collection_plan())
+
+
+async def forecast(request: Request):
+    return JSONResponse(scoring.forecast(int_param(request, "days", 7, 3, 30)))
+
+
+async def compliance(request: Request):
+    """Everything an estate office needs for its SWM Rules 2026 records, for one period."""
+    days = int_param(request, "days", 30, 1, 90)
+    return JSONResponse({
+        "generated_at": db.now_iso(),
+        "period_days": days,
+        "summary": scoring.campus_summary(days),
+        "bhawans": scoring.bhawan_scores(days),
+        "issues": db.list_issues(None, limit=500),
+        "forecast": scoring.forecast(min(days, 14)),
+        "method": {
+            "grade_cutoffs": {"A": config.GRADE_A_MAX_PCT, "B": config.GRADE_B_MAX_PCT},
+            "kg_per_wet_bin": config.KG_PER_WET_BIN,
+            "co2e_factor": config.CO2E_KG_PER_KG_COMPOSTED,
+            "co2e_source": "US EPA WARM v12 (2012), food scraps: landfill 0.69 vs composting -0.20 MTCO2E/short ton",
+            "llm_chain": get_gateway().chain,
+        },
+    })
 
 
 async def bhawan_detail(request: Request):
@@ -317,6 +367,10 @@ routes = [
     Route("/api/reports", create_report, methods=["POST"]),
     Route("/api/reports", list_reports),
     Route("/api/reports/{id:int}", get_report),
+    Route("/api/reports/{id:int}/verdict", report_verdict, methods=["POST"]),
+    Route("/api/collection-plan", collection_plan),
+    Route("/api/forecast", forecast),
+    Route("/api/compliance", compliance),
     Route("/api/photos/{name}", photo),
     Route("/api/audio/{name}", audio),
     Route("/api/leaderboard", leaderboard),
