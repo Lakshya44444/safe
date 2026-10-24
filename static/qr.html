@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="hi-Latn">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dabba QR Stickers</title>
+  <title>Bin QR Stickers</title>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Hind:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <style>
@@ -33,13 +33,13 @@
 <body>
   <div class="qr-page">
     <div class="top-print">
-      <h1>Dabba QR stickers</h1>
-      <p class="sub">Har dabbe pe uske rang ka sticker chipkao. Scan karte hi report screen khulti hai, Bhawan aur dabba pehle se bhara hota hai, sirf photo leni hai.</p>
+      <h1>Bin QR stickers</h1>
+      <p class="sub">Stick each sticker on the bin of the same colour. Scanning it opens the report screen with the Bhawan and bin already filled in, so the worker only takes the photo.</p>
     </div>
     <div class="qr-controls">
       <label>Bhawan <select id="bh"></select></label>
-      <button type="button" onclick="print()">Print karo</button>
-      <a href="./">Dashboard pe wapas</a>
+      <button type="button" onclick="print()">Print</button>
+      <a href="./">Back to the dashboard</a>
     </div>
     <div class="sheet" id="sheet"></div>
   </div>
@@ -47,10 +47,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     const STREAMS = [
-      ["wet", "Geela", "var(--wet)", "khaana, chhilke, chai patti"],
-      ["dry", "Sookha", "var(--dry)", "plastic, kaagaz, bottle"],
-      ["sanitary", "Sanitary", "var(--sanitary)", "diaper, pad"],
-      ["special_care", "Special care", "var(--special)", "dawai, bulb, battery"],
+      ["wet", "Wet", "var(--wet)", "food, peels, tea leaves"],
+      ["dry", "Dry", "var(--dry)", "plastic, paper, bottles"],
+      ["sanitary", "Sanitary", "var(--sanitary)", "diapers, pads"],
+      ["special_care", "Special care", "var(--special)", "medicines, bulbs, batteries"],
     ];
     const base = location.href.replace(/qr\.html.*$/, "");
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -61,8 +61,8 @@
         <div class="sticker" style="--c:${c}">
           <h3>${name}</h3>
           <div class="bh">${esc(bhawan)} Bhawan</div>
-          <div class="code" data-url="${esc(`${base}?b=${encodeURIComponent(bhawan)}&s=${s}#report`)}"></div>
-          <p>Sirf ${hint}. Scan karke photo bhejo.</p>
+          <div class="code" data-url="${esc(`${base}?b=${encodeURIComponent(bhawan)}&s=${s}`)}"></div>
+          <p>Only ${hint}. Scan, then send a photo.</p>
         </div>`).join("");
       sheet.querySelectorAll(".code").forEach((el) => {
         if (window.QRCode) new QRCode(el, { text: el.dataset.url, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });

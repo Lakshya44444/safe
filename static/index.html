@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="hi-Latn">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kachra Report Card</title>
-  <meta name="description" content="Har Bhawan ka roz ka kachra segregation report card, IIT Roorkee">
+  <meta name="description" content="A daily waste-segregation report card for every hostel at IIT Roorkee">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Hind:wght@400;500;600&display=swap" rel="stylesheet">
@@ -21,12 +21,12 @@
       </svg>
       <div>
         <h1>Kachra Report Card</h1>
-        <p class="sub">IIT Roorkee ke Bhawans, roz ka segregation hisaab</p>
+        <p class="sub">How well each IIT Roorkee Bhawan separates its waste, every day</p>
       </div>
     </div>
-    <nav class="tabs" role="tablist">
+    <nav class="tabs" role="tablist" aria-label="Views">
       <button role="tab" id="tab-board" aria-selected="true" aria-controls="view-board">Leaderboard</button>
-      <button role="tab" id="tab-report" aria-selected="false" aria-controls="view-report">Report karo</button>
+      <button role="tab" id="tab-report" aria-selected="false" aria-controls="view-report">Report a bin</button>
     </nav>
   </header>
 
@@ -36,13 +36,13 @@
       <div class="summary" id="summary" aria-live="polite"></div>
 
       <div class="board-head">
-        <h2>Is hafte ki ranking</h2>
+        <h2>Bhawan ranking</h2>
         <label class="range">
-          <span>Pichhle</span>
+          <span>Last</span>
           <select id="days">
-            <option value="1">1 din</option>
-            <option value="7" selected>7 din</option>
-            <option value="30">30 din</option>
+            <option value="1">1 day</option>
+            <option value="7" selected>7 days</option>
+            <option value="30">30 days</option>
           </select>
         </label>
       </div>
@@ -50,91 +50,91 @@
 
       <div class="split">
         <div class="trend-wrap">
-          <h2>Campus ka score, din-ba-din</h2>
+          <h2>Campus score by day</h2>
           <svg id="trend" class="trend" viewBox="0 0 640 180" role="img" aria-label="Daily campus segregation score"></svg>
         </div>
         <div>
-          <h2>Kaunsa dabba sahi rehta hai</h2>
-          <p class="hint">Har tarah ke dabbon mein se kitne ekdum saaf mile</p>
+          <h2>Which bins stay clean</h2>
+          <p class="hint">Share of each bin type graded A</p>
           <ul class="streams" id="streams"></ul>
         </div>
       </div>
 
       <div class="issues-wrap">
-        <h2>Khuli shikayatein</h2>
+        <h2>Open complaints</h2>
         <ul class="issues" id="issues"></ul>
       </div>
 
       <div class="recent">
-        <h2>Taaza reports</h2>
+        <h2>Latest reports</h2>
         <ul id="recent"></ul>
       </div>
     </section>
 
     <!-- Worker report -->
     <section id="view-report" role="tabpanel" aria-labelledby="tab-report" hidden>
-      <form id="report-form" class="report">
+      <form id="report-form" class="report" novalidate>
         <label class="field">
           <span>Bhawan</span>
           <select name="bhawan" id="bhawan" required></select>
         </label>
 
         <fieldset class="field">
-          <legend>Kaunsa dabba?</legend>
+          <legend>Which bin?</legend>
           <div class="bins" id="bins"></div>
         </fieldset>
 
         <label class="photo-drop" id="photo-drop">
-          <input type="file" name="photo" id="photo" accept="image/*" capture="environment">
-          <img id="photo-preview" alt="" hidden>
-          <span id="photo-hint">Dabbe ki photo lo</span>
+          <input type="file" name="photo" id="photo" accept="image/jpeg,image/png,image/webp" capture="environment">
+          <img id="photo-preview" alt="Photo of the bin" hidden>
+          <span id="photo-hint">Take a photo of the bin from above</span>
         </label>
 
         <div class="field">
-          <span class="label">Kuch bolna hai? (optional)</span>
+          <label class="label" for="note">Anything to add? (optional)</label>
           <div class="voice-row">
             <button type="button" class="mic" id="mic" aria-pressed="false">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1A7 7 0 0 0 19 12h-2Z"/></svg>
-              <span id="mic-label">Bol ke batao</span>
+              <span id="mic-label">Speak</span>
             </button>
-            <input type="text" name="note" id="note" placeholder="jaise: wet dabbe mein polythene hai">
+            <input type="text" name="note" id="note" placeholder="e.g. plastic bag in the wet bin">
           </div>
         </div>
 
         <label class="field">
-          <span>Aapka naam (optional)</span>
+          <span>Your name (optional)</span>
           <input type="text" name="reporter" id="reporter" autocomplete="name">
         </label>
 
-        <button type="submit" class="submit" id="submit">Report bhejo</button>
+        <button type="submit" class="submit" id="submit">Send report</button>
         <p class="form-error" id="form-error" role="alert"></p>
       </form>
 
       <div class="result" id="result" hidden aria-live="polite"></div>
 
       <div class="quick">
-        <h2>Koi aur dikkat?</h2>
-        <p>Upar Bhawan chuno, phir dabao. Shikayat seedha dashboard pe jaayegi.</p>
+        <h2>Another problem?</h2>
+        <p>Choose the Bhawan above, then tap. The complaint goes straight to the dashboard.</p>
         <div class="quick-row" id="quick">
-          <button type="button" data-kind="overflow">Dabba bhar gaya</button>
-          <button type="button" data-kind="missed_pickup">Gaadi nahi aayi</button>
-          <button type="button" data-kind="broken_bin">Dabba toota hai</button>
+          <button type="button" data-kind="overflow">Bin is full</button>
+          <button type="button" data-kind="missed_pickup">Pickup missed</button>
+          <button type="button" data-kind="broken_bin">Bin is broken</button>
         </div>
         <p class="quick-msg" id="quick-msg" role="status"></p>
       </div>
 
       <div class="agent" id="agent" hidden>
-        <h2>Ya seedha baat karo</h2>
-        <p>Bina type kiye report karo. Bhawan aur dabba bolo, agent report darj kar dega.</p>
+        <h2>Or just talk</h2>
+        <p>Report hands-free: say the Bhawan, the bin and what you see. The voice agent logs it for you.</p>
         <div id="agent-slot"></div>
       </div>
     </section>
   </main>
 
   <footer class="foot">
-    <a href="qr.html">Dabbon ke liye QR stickers print karo</a>.
-    Grades follow India's Solid Waste Management Rules 2026: geela, sookha, sanitary, special care.
-    A = 10% tak galat cheezein, B = 35% tak, C = usse zyada.
+    <a href="qr.html">Print QR stickers for the bins</a>.
+    Grades follow India's Solid Waste Management Rules 2026 (wet, dry, sanitary, special care):
+    A means up to 10% of items belong in another bin, B up to 35%, C more than that.
   </footer>
 
   <script src="app.js"></script>

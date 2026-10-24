@@ -123,7 +123,7 @@ class MockProvider:
         "packet": "chips packet", "bottle": "bottle", "tin can": "metal can", "food": "food scraps",
         "peel": "vegetable peels", "paper": "paper", "cardboard": "cardboard", "pad": "sanitary pad",
         "diaper": "diaper", "medicine": "medicine strip", "battery": "battery", "bulb": "bulb",
-        "glass": "glass", "mixed": "mixed waste",
+        "glass": "glass",
         # Hindi / Hinglish words workers commonly use
         "khaana": "food scraps", "khana": "food scraps", "kaagaz": "paper", "dawai": "medicine strip",
     }
