@@ -6,8 +6,14 @@ const API = (new URLSearchParams(location.search).get("api") || "").replace(/\/$
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
-const GRADE_COLOR = { A: "var(--grade-a)", B: "var(--grade-b)", C: "var(--grade-c)" };
+const GRADE_COLOR = { A: "var(--pass)", B: "var(--warn)", C: "var(--pen)" };
 const GRADE_WORD = { A: "Good job!", B: "Needs attention", C: "Oops!" };
+const STREAM_COLOR = { wet: "var(--wet)", dry: "var(--dry)", sanitary: "var(--san)", special_care: "var(--spc)" };
+const BIN_SVG = (s, cls = "") => `<svg class="${cls}" style="color:${STREAM_COLOR[s]}" aria-hidden="true"><use href="#bin"/></svg>`;
+const PLAY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5Z"/></svg>';
+// A Bhawan's letter grade from its 0-100 score.
+const letter = (score) => (score >= 80 ? "A" : score >= 60 ? "B" : "C");
+let days = 7;
 const STREAM_NAME = { wet: "Wet", dry: "Dry", sanitary: "Sanitary", special_care: "Special care" };
 const STREAM_HINT = {
   wet: "food, peels, tea leaves",
@@ -82,82 +88,114 @@ $("#tab-report").onclick = () => showTab("report");
 /* ---------- leaderboard ---------- */
 
 async function loadBoard() {
-  const days = $("#days").value;
-  let rows, sum, recent;
+  let rows, sum, recent, today;
   try {
-    [rows, sum, recent] = await Promise.all([
+    [rows, sum, recent, today] = await Promise.all([
       api(`/api/leaderboard?days=${days}`),
       api(`/api/summary?days=${days}`),
       api("/api/reports?limit=8"),
+      api("/api/summary?days=1"),
     ]);
   } catch (e) {
-    $("#board").innerHTML = `<li class="row">${esc(e.message)}</li>`;
+    $("#board").innerHTML = `<li class="row empty-row">${esc(e.message)}</li>`;
     return;
   }
-
-  const fix = sum.issues.avg_hours_to_fix;
-  $("#summary").innerHTML = `
-    <div class="stat"><b>${sum.segregation_rate}%</b><span>of ${sum.reports.toLocaleString("en-IN")} bins checked were clean</span></div>
-    <div class="stat"><b>~${sum.compost_kg_estimate.toLocaleString("en-IN")} kg</b><span>wet waste ready for compost (estimate: ${sum.wet_bins_compost_ready} clean wet bins × ${sum.kg_per_wet_bin} kg)</span></div>
-    <div class="stat"><b>${sum.issues.open}</b><span>open complaints${fix != null ? `, fixed in ${fix} h on average` : ""}</span></div>`;
-
-  $("#board").innerHTML = rows.length ? rows.map(boardRow).join("")
-    : `<li class="row empty-row">No reports yet. Send the first one from "Report a bin".</li>`;
-
+  renderHero(today, sum, rows);
+  renderBoard(rows);
   drawTrend(sum.daily);
   drawStreams(sum.by_stream);
   loadIssues();
-
-  $("#recent").innerHTML = recent.map((r) => {
-    const text = r.status === "graded" ? r.tag : r.status === "failed" ? `Not graded: ${r.error || ""}` : "Grading…";
-    return `<li>
-      <span class="pill" style="background:${GRADE_COLOR[r.grade] || "var(--muted)"}">${r.grade || "…"}</span>
-      <div><div>${esc(text)}</div>
-      <div class="meta">${esc(r.bhawan)}, ${STREAM_NAME[r.bin_stream] || r.bin_stream} bin, ${timeAgo(r.created_at)}</div></div>
-    </li>`;
-  }).join("");
+  renderFeed(recent);
 }
-$("#days").onchange = loadBoard;
 
-function boardRow(r) {
+$$(".range button").forEach((b) => b.addEventListener("click", () => {
+  days = Number(b.dataset.days);
+  $$(".range button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  loadBoard();
+}));
+
+// The hero: today's campus grade, a teacher's remark and three marks.
+function renderHero(today, week, rows) {
+  const lastDay = week.daily[week.daily.length - 1];
+  const score = today.reports ? today.daily.at(-1)?.score ?? 0 : lastDay?.score;
+  const grade = score == null ? "–" : letter(score);
+  const stamp = $("#campus-grade");
+  stamp.textContent = grade;
+  stamp.className = `stamp-xl g-${grade}`;
+  void stamp.offsetWidth;            // restart the landing animation
+  stamp.classList.add("landed");
+  $("#campus-score").textContent = score ?? "–";
+  $("#hero-title").textContent = today.reports ? "Campus grade, today" : "Campus grade, latest day";
+
+  const items = {};
+  rows.forEach((r) => r.top_wrong_items.forEach((it, i) => { items[it] = (items[it] || 0) + 3 - i; }));
+  const worst = Object.entries(items).sort((x, y) => y[1] - x[1])[0]?.[0];
+  const best = rows[0]?.bhawan;
+  $("#remark").textContent =
+    score == null ? "No bins checked yet. The first photo starts the report card." :
+    grade === "A" ? `Excellent work, Roorkee.${best ? ` ${best} leads the class.` : ""}` :
+    grade === "B" ? `Good effort.${worst ? ` Keep ${worst} out of the wrong bins.` : ""}` :
+    `Needs work.${worst ? ` Too much ${worst} in the wrong bins.` : ""}`;
+
+  const fix = week.issues.avg_hours_to_fix;
+  $("#marks").innerHTML = `
+    <div class="mark"><dd>${week.segregation_rate}%</dd><dt>bins clean</dt><small>${week.reports.toLocaleString("en-IN")} checked in ${week.days === 1 ? "a day" : week.days + " days"}</small></div>
+    <div class="mark"><dd>~${week.compost_kg_estimate.toLocaleString("en-IN")} kg</dd><dt>ready for compost</dt><small>estimate: ${week.wet_bins_compost_ready} clean wet bins × ${week.kg_per_wet_bin} kg</small></div>
+    <div class="mark"><dd>${week.issues.open}</dd><dt>open complaints</dt><small>${fix != null ? `fixed in ${fix} h on average` : "none fixed yet"}</small></div>`;
+}
+
+function renderBoard(rows) {
+  const board = $("#board");
+  board.classList.remove("landed");
+  board.innerHTML = rows.length ? rows.map(boardRow).join("")
+    : `<li class="row empty-row">No bins checked in this period. Send the first one from "Check a bin".</li>`;
+  void board.offsetWidth;
+  board.classList.add("landed");
+}
+
+function boardRow(r, i) {
   const n = r.reports || 1;
   const pct = (k) => (100 * r.grades[k]) / n;
-  const trend = r.trend > 0 ? `<div class="trend-up">+${r.trend} vs week</div>`
-    : r.trend < 0 ? `<div class="trend-down">${r.trend} vs week</div>` : "";
-  const wrong = r.top_wrong_items.length ? "Wrong items: " + esc(r.top_wrong_items.join(", ")) : "No wrong items found";
-  return `<li class="row">
+  const g = letter(r.score);
+  const trend = r.trend > 0 ? `<span class="trend-up">▲ ${r.trend} today</span>`
+    : r.trend < 0 ? `<span class="trend-down">▼ ${Math.abs(r.trend)} today</span>` : "";
+  const wrong = r.top_wrong_items.length ? "Found: " + esc(r.top_wrong_items.join(", ")) : "Nothing in the wrong bin";
+  return `<li class="row" style="--i:${i}">
+    ${i < 3 ? '<svg class="star" aria-hidden="true"><use href="#star"/></svg>' : ""}
     <div class="rank">${r.rank}</div>
-    <div class="name">${esc(r.bhawan)}<small>${r.reports} bins</small></div>
+    <div class="name">${esc(r.bhawan)}<small>${r.reports} bins checked</small></div>
     <div class="mid">
       <div class="bar" role="img" aria-label="${r.grades.A} clean, ${r.grades.B} slightly mixed, ${r.grades.C} mixed">
         <i class="a" style="width:${pct("A")}%"></i><i class="b" style="width:${pct("B")}%"></i><i class="c" style="width:${pct("C")}%"></i>
       </div>
       <div class="wrong">${wrong}</div>
     </div>
-    <div class="score"><b>${r.score}</b>${trend}
-      <button class="play" data-bhawan="${esc(r.bhawan)}" aria-label="Play ${esc(r.bhawan)}'s voice report">Listen</button>
-    </div>
+    <div class="score">${r.score}<small>/100</small>${trend}</div>
+    <div class="stamp g-${g}" aria-label="Grade ${g}">${g}</div>
+    <button class="play" data-bhawan="${esc(r.bhawan)}" aria-label="Play ${esc(r.bhawan)}'s voice report">${PLAY_SVG}</button>
   </li>`;
 }
 
-// Share of each bin type graded A.
 function drawStreams(byStream) {
   $("#streams").innerHTML = Object.entries(byStream).map(([s, v]) => `
     <li>
-      <span class="sname"><i class="sw bin-${s}"></i>${STREAM_NAME[s]}</span>
-      <span class="sbar"><i style="width:${v.clean_rate ?? 0}%"></i></span>
+      ${BIN_SVG(s)}
+      <div><div class="sname">${STREAM_NAME[s]} bins</div>
+        <div class="sbar"><i style="width:${v.clean_rate ?? 0}%;background:${STREAM_COLOR[s]}"></i></div></div>
       <span class="sval">${v.clean_rate == null ? "–" : v.clean_rate + "%"}</span>
     </li>`).join("");
 }
 
 async function loadIssues() {
   const list = await api("/api/issues?status=open").catch(() => []);
+  $("#issue-note").textContent = list.length ? `${list.length} pinned` : "";
   $("#issues").innerHTML = list.length ? list.map((i) => `
     <li>
-      <div><b>${esc(i.bhawan)}</b>: ${ISSUE_NAME[i.kind] || esc(i.kind)}${i.note ? ` – "${esc(i.note)}"` : ""}
-        <div class="meta">${timeAgo(i.created_at)}</div></div>
+      <b>${esc(i.bhawan)}</b>
+      <div class="what">${ISSUE_NAME[i.kind] || esc(i.kind)}${i.note ? ` – ${esc(i.note)}` : ""}</div>
+      <div class="meta">${timeAgo(i.created_at)}${i.reporter ? `, by ${esc(i.reporter)}` : ""}</div>
       <button class="fix" data-id="${i.id}">Mark fixed</button>
-    </li>`).join("") : `<li class="empty">No open complaints.</li>`;
+    </li>`).join("") : `<li class="empty">Nothing pinned. Every bin was emptied on time.</li>`;
 }
 $("#issues").addEventListener("click", async (e) => {
   const b = e.target.closest(".fix");
@@ -172,18 +210,34 @@ $("#issues").addEventListener("click", async (e) => {
   }
 });
 
+function renderFeed(recent) {
+  $("#recent").innerHTML = recent.length ? recent.map((r) => {
+    const text = r.status === "graded" ? r.tag : r.status === "failed" ? `Not graded: ${r.error || ""}` : "Grading…";
+    return `<li>
+      <span class="pill" style="--c:${GRADE_COLOR[r.grade] || "var(--ink-soft)"}">${r.grade || "…"}</span>
+      <div><div>${esc(text)}</div>
+      <div class="meta">${esc(r.bhawan)}, ${STREAM_NAME[r.bin_stream] || r.bin_stream} bin, ${timeAgo(r.created_at)}</div></div>
+    </li>`;
+  }).join("") : "<li>No checks yet.</li>";
+}
+
 function drawTrend(daily) {
   const svg = $("#trend");
-  if (!daily.length) { svg.innerHTML = `<text x="20" y="90">No data yet</text>`; return; }
-  const W = 640, H = 180, L = 36, R = 16, T = 16, B = 28;
+  if (!daily.length) { svg.innerHTML = `<text x="24" y="100">No data yet</text>`; return; }
+  const W = 640, H = 200, L = 38, R = 30, T = 22, B = 30;
   const x = (i) => L + (daily.length === 1 ? (W - L - R) / 2 : (i * (W - L - R)) / (daily.length - 1));
   const y = (v) => T + ((100 - v) * (H - T - B)) / 100;
-  const grid = [0, 50, 100].map((v) => `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="4" y="${y(v) + 4}">${v}</text>`).join("");
-  const pts = daily.map((d, i) => `${x(i)},${y(d.score)}`).join(" ");
-  const dots = daily.map((d, i) => `<circle class="dot" cx="${x(i)}" cy="${y(d.score)}" r="4"><title>${d.date}: ${d.score} (${d.reports} bins)</title></circle>`).join("");
+  const grid = [0, 60, 80, 100].map((v) => `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="6" y="${y(v) + 4}">${v}</text>`).join("");
+  const pts = daily.map((d, i) => `${x(i)},${y(d.score)}`);
+  const area = `<path class="area" d="M${x(0)},${y(0)} L${pts.join(" L")} L${x(daily.length - 1)},${y(0)} Z"/>`;
+  const dots = daily.map((d, i) => `<circle class="dot" cx="${x(i)}" cy="${y(d.score)}" r="4.5"><title>${d.date}: ${d.score} (${d.reports} bins)</title></circle>`).join("");
   const fmt = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  const labels = daily.map((d, i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${fmt(d.date)}</text>`).join("");
-  svg.innerHTML = grid + `<polyline class="line" points="${pts}"/>` + dots + labels;
+  const step = Math.ceil(daily.length / 8);
+  const labels = daily.map((d, i) => (i % step === 0 || i === daily.length - 1)
+    ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${fmt(d.date)}</text>` : "").join("");
+  const last = daily[daily.length - 1];
+  const lastLabel = `<text class="last" x="${x(daily.length - 1) - 6}" y="${y(last.score) - 12}" text-anchor="end">${last.score}</text>`;
+  svg.innerHTML = grid + area + `<polyline class="line" points="${pts.join(" ")}"/>` + dots + labels + lastLabel;
 }
 
 // "Listen" plays the warden's ElevenLabs voice note, or the browser reads the text if TTS is off.
@@ -191,7 +245,7 @@ let audioEl = null;
 $("#board").addEventListener("click", async (e) => {
   const btn = e.target.closest(".play");
   if (!btn) return;
-  btn.textContent = "Loading…";
+  btn.setAttribute("aria-busy", "true");
   btn.disabled = true;
   try {
     const b = await api(`/api/briefing/${encodeURIComponent(btn.dataset.bhawan)}`);
@@ -208,7 +262,7 @@ $("#board").addEventListener("click", async (e) => {
   } catch (err) {
     alert(err.message);
   } finally {
-    btn.textContent = "Listen";
+    btn.removeAttribute("aria-busy");
     btn.disabled = false;
   }
 });
@@ -223,6 +277,7 @@ function buildForm() {
 
   $("#bins").innerHTML = META.streams.map((s) => `
     <button type="button" class="bin bin-${s}" data-stream="${s}" aria-pressed="false">
+      <svg aria-hidden="true"><use href="#bin"/></svg>
       <b>${STREAM_NAME[s]}</b><small>${STREAM_HINT[s]}</small>
     </button>`).join("");
   $("#bins").onclick = (e) => {
@@ -323,33 +378,38 @@ $("#report-form").onsubmit = async (e) => {
   fd.set("bin_stream", pickedStream);
   const submit = $("#submit");
   submit.disabled = true;
-  submit.textContent = "Checking the bin…";
+  submit.textContent = "Marking…";
   try {
     showResult(await api("/api/reports?wait=1", { method: "POST", body: fd }));
   } catch (err) {
     setError(err.message);
   } finally {
     submit.disabled = false;
-    submit.textContent = "Send report";
+    submit.textContent = "Check this bin";
   }
 };
 
 function showResult(r) {
   const res = $("#result");
-  res.hidden = false;
   if (r.status !== "graded") {
-    res.innerHTML = `<div class="tag tag-C"><span class="stamp">Try again</span><p>${esc(r.error || "The bin could not be graded.")}</p></div>`;
+    res.innerHTML = `<div class="tag g-C"><div class="tag-head"><div class="tag-word">Try again</div></div>
+      <p>${esc(r.error || "The bin could not be graded.")}</p></div>`;
     return;
   }
   const message = r.tag.replace(/^(Good job!|Oops!|Needs attention:)\s*/, "");
-  res.innerHTML = `<div class="tag tag-${r.grade}">
-      <span class="stamp">${GRADE_WORD[r.grade]}</span>
+  const items = r.found_items?.length ? `<ul class="items">${r.found_items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
+  res.innerHTML = `<div class="tag g-${r.grade}">
+      <div class="tag-head">
+        <div class="stamp-xl g-${r.grade} landed">${r.grade}</div>
+        <div class="tag-word">${GRADE_WORD[r.grade]}</div>
+      </div>
       <p>${esc(message)}</p>
-      <p class="meta">${esc(r.bhawan)}, ${STREAM_NAME[r.bin_stream]} bin: grade ${r.grade}, about ${r.contamination}% wrong items</p>
+      ${items}
+      <p class="meta">${esc(r.bhawan)}, ${STREAM_NAME[r.bin_stream].toLowerCase()} bin. About ${r.contamination}% of what's inside belongs in another bin.</p>
     </div>
-    <button class="again" type="button">Report the next bin</button>`;
+    <button class="again" type="button">Check the next bin</button>`;
   res.querySelector(".again").onclick = resetForm;
-  res.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (window.matchMedia("(max-width: 860px)").matches) res.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function resetForm() {
@@ -358,7 +418,7 @@ function resetForm() {
   $("#photo-hint").hidden = false;
   pickStream(null);
   $("#bhawan").value = store.get() || "";
-  $("#result").hidden = true;
+  $("#result").innerHTML = `<div class="result-empty"><div class="stamp-ghost">A</div><p>The grade appears here, stamped, in about five seconds.</p></div>`;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
