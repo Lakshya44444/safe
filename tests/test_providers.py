@@ -83,6 +83,9 @@ class Gemini(unittest.TestCase):
         self.assertEqual(parts[1]["inline_data"]["mime_type"], "image/jpeg")
         self.assertEqual(base64.b64decode(parts[1]["inline_data"]["data"]), IMG.data)
         self.assertEqual(body["generationConfig"]["responseMimeType"], "application/json")
+        # thinking would eat the output budget and cut the JSON off
+        self.assertEqual(body["generationConfig"]["thinkingConfig"], {"thinkingBudget": 0})
+        self.assertGreaterEqual(body["generationConfig"]["maxOutputTokens"], 2048)
         self.assertEqual(body["systemInstruction"], {"parts": [{"text": "sys"}]})
         self.assertEqual((resp.provider, resp.input_tokens, resp.output_tokens), ("gemini", 812, 31))
         self.assertEqual(json.loads(resp.text), ASSESSMENT)

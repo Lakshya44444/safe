@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import logging
 import time
 from pathlib import Path
 
@@ -32,6 +33,9 @@ def _post(provider: str, url: str, *, headers: dict, payload: dict, timeout: flo
         raise ProviderError("response was not JSON", provider=provider, retryable=True) from e
 
 
+log = logging.getLogger("kachra.llm")
+
+
 class GeminiProvider:
     name = "gemini"
 
@@ -46,8 +50,13 @@ class GeminiProvider:
             parts.append({"inline_data": {"mime_type": request.image.mime, "data": request.image.b64}})
         payload: dict = {
             "contents": [{"role": "user", "parts": parts}],
-            "generationConfig": {"temperature": request.temperature, "maxOutputTokens": request.max_tokens},
+            # Gemini 2.5 "thinks" by default and the thinking tokens count against maxOutputTokens,
+            # which cut the JSON off mid-object. Grading needs no long reasoning: turn thinking off
+            # on Flash models and leave head-room for the answer.
+            "generationConfig": {"temperature": request.temperature, "maxOutputTokens": max(request.max_tokens, 2048)},
         }
+        if "flash" in self.model:
+            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
         if request.json_mode:
             payload["generationConfig"]["responseMimeType"] = "application/json"
         if request.system:
@@ -60,6 +69,8 @@ class GeminiProvider:
         try:
             cand = data["candidates"][0]
             text = "".join(p.get("text", "") for p in cand["content"]["parts"])
+            if cand.get("finishReason") == "MAX_TOKENS":
+                log.warning("gemini reply hit the token limit; JSON may be cut off")
         except (KeyError, IndexError) as e:
             cands = data.get("candidates") or [{}]
             reason = data.get("promptFeedback", {}).get("blockReason") or cands[0].get("finishReason")
