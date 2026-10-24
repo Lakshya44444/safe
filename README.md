@@ -31,6 +31,27 @@ nightly Render cron ─▶ Workflows fan-out per Bhawan ─▶ ElevenLabs voice 
 Grade rule: share of visible items that belong in a different stream.
 A = up to 10%, B = up to 35%, C = more.
 
+## Features
+
+| For whom | What |
+| --- | --- |
+| Safai karamchari | Phone screen: Bhawan, colour-coded bin, photo, voice note, instant Shabash/Oops tag |
+| Safai karamchari | One-tap complaints: bin full, pickup missed, bin broken |
+| Safai karamchari | QR sticker on every bin (`/qr.html`): scan, take photo, done |
+| Students, warden | Bhawan leaderboard, trend, clean rate per bin type, top wrong items |
+| Warden | Daily Hinglish voice note per Bhawan ("Suno") |
+| Estate office | Open complaints with "Theek ho gaya", average fix time, compost estimate |
+
+Problem-statement coverage: AI identification of wrongly segregated waste (area 1),
+overflow / missed-pickup reporting (area 2), compost-ready wet waste (area 3),
+Bhawan comparison and segregation-rate tracking (area 4).
+
+## Measuring the grader
+
+Label 30-50 real bin photos (`file,stream,grade`) and run
+`python -m scripts.eval_grader photos/labels.csv` for exact-match accuracy,
+within-one-grade accuracy and how many dirty bins were caught.
+
 ## Where ElevenLabs is used
 
 | Feature | ElevenLabs product |
@@ -83,6 +104,7 @@ Server tools (POST, JSON body):
 | --- | --- | --- |
 | `file_report` | `https://<web-service>/api/agent/report` | `bhawan`, `bin_stream`, `note`, `reporter` (strings) |
 | `get_score` | `https://<web-service>/api/agent/score` | `bhawan` (string) |
+| `report_issue` | `https://<web-service>/api/agent/issue` | `bhawan`, `kind`, `note` (strings) |
 
 ## API
 
@@ -95,6 +117,9 @@ Server tools (POST, JSON body):
 | GET | `/api/summary?days=7` | campus stats + daily trend |
 | GET | `/api/briefing/{bhawan}` | warden script + ElevenLabs audio URL |
 | POST | `/api/transcribe` | multipart `audio` → text |
+| POST | `/api/issues` | `bhawan`, `kind` (overflow, missed_pickup, broken_bin), `note` |
+| GET | `/api/issues?status=open` | open complaints |
+| POST | `/api/issues/{id}/resolve` | mark fixed |
 
 ## Sources
 
