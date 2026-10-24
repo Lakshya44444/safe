@@ -370,7 +370,7 @@ working if the model quota runs out.
 | Warden's daily briefing | Text-to-speech (`eleven_multilingual_v2`) | `GET /api/briefing/{bhawan}` |
 | Hands-free reporting | Agents platform with server tools | `/api/agent/*` |
 
-Briefing audio is cached per Bhawan per day, so each briefing is generated once.
+Briefing audio is cached by its text, so replaying the same briefing costs nothing.
 
 **Voice agent setup** (optional; set `ELEVENLABS_AGENT_ID` and the widget appears in the app):
 
