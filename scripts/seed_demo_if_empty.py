@@ -10,7 +10,7 @@ from scripts import seed_demo
 
 if __name__ == "__main__":
     db.init_db()
-    if os.getenv("SEED_DEMO", "1") != "0" and not db.list_reports(limit=1):
+    if os.getenv("SEED_DEMO", "1") != "0" and not db.has_reports():
         seed_demo.main()
     else:
-        print("database already has reports, not seeding")
+        print("not seeding (database has reports or SEED_DEMO=0)")

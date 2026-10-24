@@ -3,3 +3,5 @@ uvicorn>=0.30
 python-multipart>=0.0.9
 requests>=2.31
 pydantic>=2.6
+# Optional: LangSmith tracing and eval experiments (LANGSMITH_TRACING=true)
+langsmith>=0.3

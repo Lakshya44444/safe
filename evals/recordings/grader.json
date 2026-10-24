@@ -1,0 +1,19 @@
+{
+  "_comment": "Fixture outputs in the shape a vision/text LLM returns, including messy formats (code fences, chatter, '%' strings). Used to test the eval harness and gateway parsing offline. Replace with real recordings via: python -m evals.run_evals --provider gemini --record",
+  "n01": "{\"readable\": true, \"contamination_pct\": 0, \"wrong_items\": [], \"confidence\": 0.9}",
+  "n02": "```json\n{\"readable\": true, \"contamination_pct\": 45, \"wrong_items\": [\"plastic bag\", \"plastic bottle\"], \"confidence\": 0.85}\n```",
+  "n03": "{\"readable\": true, \"contamination_pct\": 12, \"wrong_items\": [\"food packet\"], \"confidence\": 0.7}",
+  "n04": "{\"readable\": true, \"contamination_pct\": 0, \"wrong_items\": [], \"confidence\": 0.8}",
+  "n05": "Here is the assessment:\n{\"readable\": true, \"contamination_pct\": \"50%\", \"wrong_items\": [\"Plastic bag\", \"chips packet\"], \"confidence\": 0.8}",
+  "n06": "{\"readable\": true, \"contamination_pct\": 0, \"wrong_items\": [], \"confidence\": 0.9}",
+  "n07": "{\"readable\": true, \"contamination_pct\": 40, \"wrong_items\": [\"sanitary pad\"], \"confidence\": 0.8}",
+  "n08": "{\"readable\": true, \"contamination_pct\": 0, \"wrong_items\": [], \"confidence\": 0.85}",
+  "n09": "{\"readable\": true, \"contamination_pct\": 40, \"wrong_items\": [\"food scraps\"], \"confidence\": 0.75}",
+  "n10": "{\"readable\": true, \"contamination_pct\": 15, \"wrong_items\": [\"paper cups\"], \"confidence\": 0.7}",
+  "n11": "{\"readable\": true, \"contamination_pct\": 45, \"wrong_items\": [\"plastic bag\", \"bottle\"], \"confidence\": 0.85}",
+  "n12": "{\"readable\": true, \"contamination_pct\": 80, \"wrong_items\": [\"food waste\"], \"confidence\": 0.8}",
+  "n13": "{\"readable\": false, \"contamination_pct\": 0, \"wrong_items\": [], \"confidence\": 0.9}",
+  "n14": "{\"readable\": true, \"contamination_pct\": 0, \"wrong_items\": [], \"confidence\": 0.85}",
+  "n15": "{\"readable\": true, \"contamination_pct\": 50, \"wrong_items\": [\"plastic packets\", \"thermocol plates\"], \"confidence\": 0.8}",
+  "n16": "{\"readable\": true, \"contamination_pct\": 20, \"wrong_items\": [\"battery\"], \"confidence\": 0.75}"
+}

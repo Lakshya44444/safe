@@ -8,3 +8,4 @@ data/uploads/
 data/audio/
 .pytest_cache/
 node_modules/
+evals/results/
