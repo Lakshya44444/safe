@@ -48,9 +48,21 @@
       </div>
       <ol class="board" id="board"></ol>
 
-      <div class="trend-wrap">
-        <h2>Campus ka score, din-ba-din</h2>
-        <svg id="trend" class="trend" viewBox="0 0 640 180" role="img" aria-label="Daily campus segregation score"></svg>
+      <div class="split">
+        <div class="trend-wrap">
+          <h2>Campus ka score, din-ba-din</h2>
+          <svg id="trend" class="trend" viewBox="0 0 640 180" role="img" aria-label="Daily campus segregation score"></svg>
+        </div>
+        <div>
+          <h2>Kaunsa dabba sahi rehta hai</h2>
+          <p class="hint">Har tarah ke dabbon mein se kitne ekdum saaf mile</p>
+          <ul class="streams" id="streams"></ul>
+        </div>
+      </div>
+
+      <div class="issues-wrap">
+        <h2>Khuli shikayatein</h2>
+        <ul class="issues" id="issues"></ul>
       </div>
 
       <div class="recent">
@@ -100,6 +112,17 @@
 
       <div class="result" id="result" hidden aria-live="polite"></div>
 
+      <div class="quick">
+        <h2>Koi aur dikkat?</h2>
+        <p>Upar Bhawan chuno, phir dabao. Shikayat seedha dashboard pe jaayegi.</p>
+        <div class="quick-row" id="quick">
+          <button type="button" data-kind="overflow">Dabba bhar gaya</button>
+          <button type="button" data-kind="missed_pickup">Gaadi nahi aayi</button>
+          <button type="button" data-kind="broken_bin">Dabba toota hai</button>
+        </div>
+        <p class="quick-msg" id="quick-msg" role="status"></p>
+      </div>
+
       <div class="agent" id="agent" hidden>
         <h2>Ya seedha baat karo</h2>
         <p>Bina type kiye report karo. Bhawan aur dabba bolo, agent report darj kar dega.</p>
@@ -109,6 +132,7 @@
   </main>
 
   <footer class="foot">
+    <a href="qr.html">Dabbon ke liye QR stickers print karo</a>.
     Grades follow India's Solid Waste Management Rules 2026: geela, sookha, sanitary, special care.
     A = 10% tak galat cheezein, B = 35% tak, C = usse zyada.
   </footer>

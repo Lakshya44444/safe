@@ -183,3 +183,43 @@ main { max-width: 980px; margin: 0 auto; padding: 0 16px 3rem; }
   .row { grid-template-columns: 2rem 1fr auto; }
   .row .mid { grid-column: 2 / 4; grid-row: 2; }
 }
+
+/* Trend + stream breakdown side by side */
+.split { display: grid; grid-template-columns: 3fr 2fr; gap: 1.5rem; margin-bottom: 2.2rem; }
+.split .trend-wrap { margin-bottom: 0; }
+.hint { color: var(--muted); font-size: .9rem; margin: -.4rem 0 .8rem; }
+.streams { list-style: none; padding: 0; margin: 0; display: grid; gap: .7rem; }
+.streams li { display: grid; grid-template-columns: 7.5rem 1fr 3rem; gap: .6rem; align-items: center; }
+.sname { display: flex; gap: .45rem; align-items: center; font-weight: 600; }
+.sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.sbar { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+.sbar i { display: block; height: 100%; background: var(--grade-a); }
+.sval { text-align: right; font-family: var(--display); font-weight: 700; }
+
+/* Open issues */
+.issues-wrap { margin-bottom: 2.2rem; }
+.issues { list-style: none; padding: 0; margin: 0; display: grid; gap: .45rem; }
+.issues li {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--grade-b);
+  border-radius: 10px; padding: .6rem .8rem;
+}
+.issues li.empty { border-left-color: var(--grade-a); color: var(--muted); }
+.issues .meta { color: var(--muted); font-size: .85rem; }
+.fix { border: 1px solid var(--line); background: none; border-radius: 999px; padding: .3rem .8rem; cursor: pointer; white-space: nowrap; }
+.fix:hover { border-color: var(--grade-a); color: var(--grade-a); }
+
+/* Quick issue buttons on the worker screen */
+.quick { margin-top: 2.4rem; max-width: 520px; }
+.quick p { color: var(--muted); margin-top: 0; }
+.quick-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.quick-row button {
+  min-height: 56px; border: 2px solid var(--line); background: var(--card); border-radius: 12px;
+  font-weight: 600; cursor: pointer; padding: .4rem;
+}
+.quick-row button:hover { border-color: var(--ink); }
+.quick-msg { min-height: 1.2em; margin-top: .6rem; }
+
+@media (max-width: 760px) {
+  .split { grid-template-columns: 1fr; }
+}

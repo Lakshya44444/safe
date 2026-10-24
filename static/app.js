@@ -62,10 +62,14 @@ async function loadBoard() {
   ]).catch((e) => { $("#board").innerHTML = `<li>${esc(e.message)}</li>`; return [null]; });
   if (!rows) return;
 
+  const fix = sum.issues.avg_hours_to_fix;
   $("#summary").innerHTML = `
-    <div class="stat"><b>${sum.segregation_rate}%</b><span>dabbe ekdum saaf mile</span></div>
-    <div class="stat"><b>${sum.reports}</b><span>dabbe check hue</span></div>
-    <div class="stat"><b>${sum.wet_bins_compost_ready}</b><span>geele dabbe compost ke layak</span></div>`;
+    <div class="stat"><b>${sum.segregation_rate}%</b><span>dabbe ekdum saaf mile (${sum.reports} check hue)</span></div>
+    <div class="stat"><b>~${sum.compost_kg_estimate.toLocaleString("en-IN")} kg</b><span>geela kachra compost ke layak (${sum.wet_bins_compost_ready} saaf dabbe × ${sum.kg_per_wet_bin} kg, andaza)</span></div>
+    <div class="stat"><b>${sum.issues.open}</b><span>khuli shikayatein${fix != null ? `, theek hone mein avg ${fix} ghante` : ""}</span></div>`;
+
+  drawStreams(sum.by_stream);
+  loadIssues();
 
   $("#board").innerHTML = rows.length ? rows.map((r) => {
     const n = r.reports || 1;
@@ -97,6 +101,35 @@ async function loadBoard() {
   </li>`).join("");
 }
 $("#days").onchange = loadBoard;
+
+// Which bin type goes wrong most: share of each stream's bins graded A.
+function drawStreams(byStream) {
+  $("#streams").innerHTML = Object.entries(byStream).map(([s, v]) => `
+    <li>
+      <span class="sname"><i class="sw bin-${s}"></i>${STREAM_NAME[s]}</span>
+      <span class="sbar"><i style="width:${v.clean_rate ?? 0}%"></i></span>
+      <span class="sval">${v.clean_rate == null ? "–" : v.clean_rate + "%"}</span>
+    </li>`).join("");
+}
+
+const ISSUE_NAME = { overflow: "Dabba bhar gaya", missed_pickup: "Gaadi nahi aayi", broken_bin: "Dabba toota", other: "Aur kuch" };
+
+async function loadIssues() {
+  const list = await api("/api/issues?status=open").catch(() => []);
+  $("#issues").innerHTML = list.length ? list.map((i) => `
+    <li>
+      <div><b>${esc(i.bhawan)}</b>: ${ISSUE_NAME[i.kind] || i.kind}${i.note ? `, "${esc(i.note)}"` : ""}
+        <div class="meta">${timeAgo(i.created_at)}</div></div>
+      <button class="fix" data-id="${i.id}">Theek ho gaya</button>
+    </li>`).join("") : `<li class="empty">Koi khuli shikayat nahi.</li>`;
+}
+$("#issues").addEventListener("click", async (e) => {
+  const b = e.target.closest(".fix");
+  if (!b) return;
+  b.disabled = true;
+  await api(`/api/issues/${b.dataset.id}/resolve`, { method: "POST" }).catch((err) => alert(err.message));
+  loadBoard();
+});
 
 function drawTrend(daily) {
   const svg = $("#trend");
@@ -283,6 +316,35 @@ function showResult(r) {
   res.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+$("#quick").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const bhawan = $("#bhawan").value;
+  if (!bhawan) { $("#quick-msg").textContent = "Pehle upar Bhawan chuno."; return; }
+  b.disabled = true;
+  try {
+    const r = await api("/api/issues", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bhawan, kind: b.dataset.kind, reporter: $("#reporter").value }),
+    });
+    $("#quick-msg").textContent = `${r.bhawan}: "${b.textContent}" shikayat darj ho gayi (number ${r.id}).`;
+  } catch (err) {
+    $("#quick-msg").textContent = err.message;
+  } finally {
+    b.disabled = false;
+  }
+});
+
+// A QR sticker on each bin opens /?b=Govind&s=wet#report, so the worker only takes the photo.
+function prefillFromLink() {
+  const q = new URLSearchParams(location.search);
+  const b = q.get("b"), s = q.get("s");
+  if (b && META.bhawans.includes(b)) $("#bhawan").value = b;
+  if (s && META.streams.includes(s)) document.querySelector(`.bin[data-stream="${s}"]`)?.click();
+  return Boolean(b || s);
+}
+
 /* ---------- Start ---------- */
 (async function init() {
   try {
@@ -292,5 +354,6 @@ function showResult(r) {
     return;
   }
   buildForm();
-  showTab(location.hash === "#report" ? "report" : "board");
+  const fromQr = prefillFromLink();
+  showTab(location.hash === "#report" || fromQr ? "report" : "board");
 })();
